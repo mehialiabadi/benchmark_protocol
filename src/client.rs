@@ -63,14 +63,38 @@ fn write_to_server(server_address: &str, data: i32) -> io::Result<()> {
 
     Ok(())
 }
-
-fn send_data_to_server(server_address: &str, data: &i32) -> io::Result<()> {
+fn send_data_to_p1(server_address: &str, data: &i32) -> io::Result<()> {
     // Connect to the server
     let mut stream = TcpStream::connect(server_address)?;
+    // let json_user = serde_json::to_string(&data).unwrap();
 
     // Send data to the server
-    stream.write_all(&data.to_be_bytes())?;
-    stream.flush();
+    stream
+        .write_all(&data.to_be_bytes())
+        .expect("Failed to write table to stream");
+
+    // println!(
+    //     "Client sent to {}: {:?}",
+    //     server_address,
+    //     &data.to_be_bytes()
+    // );
+
+    // Read and print the response from the server (optional)
+    // let mut response = [0; 1024];
+    // let bytes_read = stream.read(&mut response)?;
+    // println!("Client received from {}: {:?}", server_address, &response[..bytes_read]);
+
+    Ok(())
+}
+fn send_data_to_p2(server_address: &str, data: &i32) -> io::Result<()> {
+    // Connect to the server
+    let mut stream = TcpStream::connect(server_address)?;
+    let json_user = serde_json::to_string(&data).unwrap();
+
+    // Send data to the server
+    stream
+        .write_all(&json_user.as_bytes())
+        .expect("Failed to write table to stream");
 
     // println!(
     //     "Client sent to {}: {:?}",
@@ -112,9 +136,9 @@ fn main() {
     let (p1_share, p23_share) = generate_additive_shares(user_number);
     println!("{:?},{:?}", &p1_share, &p23_share);
 
-    let handle1 = thread::spawn(move || send_data_to_server(p1_address, &p1_share));
-    let handle2 = thread::spawn(move || send_data_to_server(p2_address, &p23_share));
-    let handle3 = thread::spawn(move || send_data_to_server(p3_address, &p23_share));
+    let handle1 = thread::spawn(move || send_data_to_p1(p1_address, &p1_share));
+    let handle2 = thread::spawn(move || send_data_to_p2(p2_address, &p23_share));
+    let handle3 = thread::spawn(move || send_data_to_p2(p3_address, &p23_share));
 
     // Wait for three threads to finish
     handle1.join().unwrap().expect("Error in thread 1");

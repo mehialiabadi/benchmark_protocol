@@ -18,41 +18,42 @@ use std::sync::mpsc::{channel, Sender};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Table {
-    rows: Vec<Vec<u8>>,
+    rows: [[u8; 8]; 2],
 }
-pub fn p2_process(pool:&Pool,truth_table: &mut Vec<Vec<u8>>,row_id:i32)->(i8,i8){
-    let column_name="order_key";
+// pub fn p2_process(pool:&Pool,truth_table: &mut Vec<Vec<u8>>,row_id:i32)->(i8,i8){
+//     let column_name="order_key";
 
-    let mut conn = pool.get_conn().unwrap();
-    let query="select id, order_key from p1test_share where id=id";
-    // let qu1: String="SELECT  id ,".to_owned()+&column_name;
-// let mut  qu2:&str=qu1.to_owned().as_str();
-// let mut qu3= ("from p1test_share where id=".to_owned()+&row_id.to_string()).to_owned().as_str();
-// let mut query=qu2.to_owned()+qu3;
-    // let query = qu2+"from p1test_share where id=".to_owned()+&row_id.to_string();
-    // let query = qu+"from p1test_share where";
+//     let mut conn = pool.get_conn().unwrap();
+//     let query="select id, order_key from p1test_share where id=id";
+//     // let qu1: String="SELECT  id ,".to_owned()+&column_name;
+// // let mut  qu2:&str=qu1.to_owned().as_str();
+// // let mut qu3= ("from p1test_share where id=".to_owned()+&row_id.to_string()).to_owned().as_str();
+// // let mut query=qu2.to_owned()+qu3;
+//     // let query = qu2+"from p1test_share where id=".to_owned()+&row_id.to_string();
+//     // let query = qu+"from p1test_share where";
 
-    let result: Option<(i32, i32)> = conn.exec_first(query, params! { "id" => row_id })
-    .map(|row| row.map(|(id, column_value)| (id, column_value)))
-    .expect("Failed to execute query");
+//     let result: Option<(i32, i32)> = conn.exec_first(query, params! { "id" => row_id })
+//     .map(|row| row.map(|(id, column_value)| (id, column_value)))
+//     .expect("Failed to execute query");
 
 
-    if let Some((id, column_value)) = result
-     {
-        println!("id: {}, value: {}", id, column_value);
-        let bin: String = format!("{:08b}", column_value);
+//     if let Some((id, column_value)) = result
+//      {
+//         println!("id: {}, value: {}", id, column_value);
+//         let bin: String = format!("{:08b}", column_value);
 
-        let (s2,r2)= p2_computaion(truth_table,&bin);
-        return  (s2,r2);
-    } else {
-        println!("No matching row found");
-        return (0,0);
-    }
-  }
+//         let (s2,r2)= p2_computaion(truth_table,&bin);
+//         return  (s2,r2);
+//     } else {
+//         println!("No matching row found");
+//         return (0,0);
+//     }
+//   }
      
 
-     fn p2_computaion(truth_table: &mut Vec<Vec<u8>>, binary_p2number: &str) -> (i8,i8){
+     fn p2_computaion(truth_table: &mut Table, binary_p2number: &str) -> (i8,i8){
         #![feature(int_roundings)]
+        // let mut truth_table1:Vec<Vec<i32>>= truth_table;
     
     let mut capital_s2:i32=0;
         let mut small_s2: i8=0;
@@ -60,16 +61,24 @@ pub fn p2_process(pool:&Pool,truth_table: &mut Vec<Vec<u8>>,row_id:i32)->(i8,i8)
     
                 for (index, character) in binary_p2number.chars().enumerate() {
                     if character == '0' {
-                
-                    capital_s2+=truth_table[1][index] as i32;
+                        let row = truth_table.rows.get_mut(1);
+           
+                        if let Some(element) = row.expect("REASON").get_mut(index) {
+                        
+                    capital_s2+=*element as i32;
+                        }
         
                     
                     }
         
                     else{
                   
-                    capital_s2+=truth_table[0][index] as i32;
-                }
+                        let row = truth_table.rows.get_mut(0);
+           
+                        if let Some(element) = row.expect("REASON").get_mut(index) {
+                        
+                    capital_s2+=*element as i32;
+                        }                }
             }
             small_s2=(capital_s2/8) as i8;
             r2=capital_s2 % 8;
@@ -145,12 +154,15 @@ fn start_p2(server_address: &str) {
             let (sender2, receiver2) = channel();
             // Spawn threads to handle each server connection
          let handle1=   thread::spawn(|| handle_client_connection(client_stream,sender1));
-         let res1 = receiver1.recv().expect("Failed to receive integer from thread 1");
+         let user_num = receiver1.recv().expect("Failed to receive integer from thread 1");
 
-
+            println!("this is the integer value from client:{:?}",user_num);
          let handle2=   thread::spawn(|| handle_p1_connection(p1_stream,sender2));
-         let res2 = receiver2.recv().expect("Failed to receive integer from thread 1");
-
+         let mut tab = receiver2.recv().expect("Failed to receive table from thread 1");
+println!("table:{:?}",tab);
+p2_computaion(&mut tab,&user_num.to_string() );
+handle1.join().unwrap();
+handle2.join().unwrap();
        
         }
     }
@@ -169,7 +181,7 @@ fn handle_client(mut stream: TcpStream) {
 
                 let mut buffer_table = [0; 16]; // 4 bytes for each element in a 2x8 table
                 stream.read_exact(&mut buffer_table).unwrap();
-                let  mut received_table: Vec<Vec<i32>> = bincode::deserialize(&buffer_table).unwrap();
+                let  mut received_table:Table = bincode::deserialize(&buffer_table).unwrap();
                 println!("table p2:{:?}",received_table);
                 
             

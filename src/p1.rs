@@ -24,7 +24,7 @@ pub struct LineItem {
 }
 #[derive(Serialize, Deserialize, Debug,Clone)]
 struct Table {
-    rows: Vec<Vec<u8>>,
+    rows: [[u8; 8]; 2],
 }
 
 fn generate_random_table(distance:i8) -> Table {
@@ -33,7 +33,7 @@ fn generate_random_table(distance:i8) -> Table {
     .map(|_| (0..8).map(|_| rng.gen_range(0..100)).collect())
     .collect();
 
-Table { rows }
+Table {rows:[[0; 8]; 2]}
 
 }
 
@@ -63,7 +63,7 @@ pub fn generate_truth_table( number:i32,distance:i8) -> (Table,Table){
         }
             }
         }
-   return  (p2_table, Table { rows: p3_table.rows.to_vec() });
+   return  (p2_table, Table { rows: p3_table.rows });
 }
 fn raw_value(pool:&Pool,user_number:i32,column_name:&str)->Result<Vec<LineItem>, mysql::Error>{
     let mut conn = pool.get_conn().unwrap();
@@ -93,6 +93,8 @@ fn send_shared__truthtable_to_parties(address:&str, table: Table,id:i32) {
     let serialized_table = serialize(&table).expect("Failed to serialize table");
 
     stream.write_all(&serialized_table).expect("Failed to write to stream");
+    stream.write_all(&id.to_be_bytes()).expect("Failed to write to stream");
+
     // writer.flush().expect("Failed to flush stream");
 
 

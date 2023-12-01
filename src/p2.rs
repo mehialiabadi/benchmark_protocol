@@ -134,17 +134,17 @@ fn handle_client_connection(mut stream: TcpStream,sender: Sender<i32>) {
 
 fn start_p2(server_address: &str) {
     let listener = TcpListener::bind(server_address).expect("Failed to bind");
-    let (sender1, receiver1) = channel();
-    let (sender2, receiver2) = channel();
+   
     for stream in listener.incoming() {
         if let Ok(stream) = stream {
             // Clone the stream for each thread
-            // let client_stream = stream.try_clone().expect("Failed to clone stream for cleint");
+            let client_stream = stream.try_clone().expect("Failed to clone stream for cleint");
             let p1_stream = stream.try_clone().expect("Failed to clone stream for  p1");
             // let (thread_sender, thread_receiver) = channel();
-
+            let (sender1, receiver1) = channel();
+            let (sender2, receiver2) = channel();
             // Spawn threads to handle each server connection
-         let handle1=   thread::spawn(|| handle_client_connection(stream,sender1));
+         let handle1=   thread::spawn(|| handle_client_connection(client_stream,sender1));
          let res1 = receiver1.recv().expect("Failed to receive integer from thread 1");
 
 

@@ -1,5 +1,5 @@
 [package]
-name = "Comparison"
+name = "benchmark_protocol"
 version = "0.1.0"
 edition = "2021"
 
@@ -21,8 +21,8 @@ name = "client"
 path = "src/client.rs"
 
 [[bin]]
-name = "p1"
-path = "src/p1.rs"
+name = "primary"
+path = "src/primary.rs"
 
 [[bin]]
 name = "p2"

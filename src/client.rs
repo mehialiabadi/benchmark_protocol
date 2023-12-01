@@ -63,14 +63,14 @@ fn write_to_server(server_address: &str, data: i32) -> io::Result<()> {
 
     Ok(())
 }
-fn send_data_to_p1(server_address: &str, data: &i32) -> io::Result<()> {
+fn send_data_to_p1(server_address: &str, data: String) -> io::Result<()> {
     // Connect to the server
     let mut stream = TcpStream::connect(server_address)?;
     // let json_user = serde_json::to_string(&data).unwrap();
 
     // Send data to the server
     stream
-        .write_all(&data.to_be_bytes())
+        .write_all(data.as_bytes())
         .expect("Failed to write table to stream");
 
     // println!(
@@ -86,14 +86,14 @@ fn send_data_to_p1(server_address: &str, data: &i32) -> io::Result<()> {
 
     Ok(())
 }
-fn send_data_to_p2(server_address: &str, data: &i32) -> io::Result<()> {
+fn send_data_to_p2(server_address: &str, data: String) -> io::Result<()> {
     // Connect to the server
     let mut stream = TcpStream::connect(server_address)?;
-    let json_user = serde_json::to_string(&data).unwrap();
+    // let json_user = serde_json::to_string(&data).unwrap();
 
     // Send data to the server
     stream
-        .write_all(&json_user.as_bytes())
+        .write_all(&data.as_bytes())
         .expect("Failed to write table to stream");
 
     // println!(
@@ -136,14 +136,14 @@ fn main() {
     let (p1_share, p23_share) = generate_additive_shares(user_number);
     println!("{:?},{:?}", &p1_share, &p23_share);
 
-    let handle1 = thread::spawn(move || send_data_to_p1(p1_address, &p1_share));
-    let handle2 = thread::spawn(move || send_data_to_p2(p2_address, &p23_share));
-    let handle3 = thread::spawn(move || send_data_to_p2(p3_address, &p23_share));
+    let handle1 = thread::spawn(move || send_data_to_p1(p1_address, p1_share.to_string()));
+    let handle2 = thread::spawn(move || send_data_to_p2(p2_address, p23_share.to_string()));
+    // let handle3 = thread::spawn(move || send_data_to_p2(p3_address, &p23_share));
 
     // Wait for three threads to finish
     handle1.join().unwrap().expect("Error in thread 1");
     handle2.join().unwrap().expect("Error in thread 1");
-    handle3.join().unwrap().expect("Error in thread 1");
+    // handle3.join().unwrap().expect("Error in thread 1");
     //////
     // println!("if data send to clients");
 

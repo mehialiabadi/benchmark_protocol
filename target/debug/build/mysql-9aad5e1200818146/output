@@ -1,0 +1,2 @@
+cargo:rustc-env=CARGO_CFG_TARGET_OS=macos
+cargo:rustc-env=CARGO_CFG_TARGET_ARCH=aarch64

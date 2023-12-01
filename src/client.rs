@@ -94,10 +94,8 @@ fn main() {
     let p2_address = "127.0.0.1:9092"; 
     let p3_address = "127.0.0.1:8083";  
     let listener_client = TcpListener::bind(client_address).unwrap();
-    println!("client is listening now on port 8080");
-    let table_name="test";
+    println!("client is listening  on port 8080");
 
-    // let column_name="order_key";
     let column_name="order_key";
 
     println!("Enter a number to search:");
@@ -105,33 +103,17 @@ fn main() {
     io::stdin().read_line(&mut input).expect("Failed to read line");
     let user_number: i32 = input.trim().parse().expect("Invalid number entered");
 
-
-    // let stream_p1 = TcpStream::connect(p1_address).unwrap();
-    // let stream_p2 = TcpStream::connect(p2_address).unwrap();
-    // let stream_p3 = TcpStream::connect(p3_address).unwrap();
-
     let start_time = Instant::now();
 
     // Generate the additive shares and send them to p1 and p2 and p3
     let (p1_share, p23_share) = generate_additive_shares(user_number);
     println!("{:?},{:?}",&p1_share,&p23_share);
-    // send_number_to_parties(stream_p1, p1_share);
-    // send_number_to_parties(stream_p2, p23_share);
-    // send_number_to_parties(stream_p3, p23_share);
+   
     let handle1 = thread::spawn(move || send_data_to_server(p1_address, &p1_share));
     let handle2 = thread::spawn(move || send_data_to_server(p2_address,&p23_share));
     let handle3 = thread::spawn(move || send_data_to_server(p3_address,&p23_share));
   
-    // if let Err(err) = send_data_to_server(p2_address, &p23_share) {
-    //     eprintln!("Error sending data to {}: {}", p2_address, err);
-    // }
-    // if let Err(err) = send_data_to_server(p3_address, &p23_share) {
-    //     eprintln!("Error sending data to {}: {}", p3_address, err);
-    // }
-    // if let Err(err) = send_data_to_server(p1_address, &p1_share) {
-    //     eprintln!("Error sending data to {}: {}", p1_address, err);
-    // }
-
+ 
 
     // Wait for three threads to finish
     handle1.join().unwrap().expect("Error in thread 1");

@@ -1,8 +1,0 @@
-/Users/neo/Documents/playground/benchmark_protocol/target/debug/deps/liberrno-5c6782c910153da7.rmeta: /Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/lib.rs /Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/unix.rs
-
-/Users/neo/Documents/playground/benchmark_protocol/target/debug/deps/liberrno-5c6782c910153da7.rlib: /Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/lib.rs /Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/unix.rs
-
-/Users/neo/Documents/playground/benchmark_protocol/target/debug/deps/errno-5c6782c910153da7.d: /Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/lib.rs /Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/unix.rs
-
-/Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/lib.rs:
-/Users/neo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/errno-0.3.7/src/unix.rs:

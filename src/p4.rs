@@ -1,9 +1,9 @@
-use std::net::{TcpStream, SocketAddr};
-use std::io::{Read, Write};
-use std::{option, thread};
+use mysql::prelude::*;
 use rand::Rng;
 use rusqlite::{Connection, Result, NO_PARAMS};
-use mysql::prelude::*;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpStream};
+use std::{option, thread};
 // use mysql::{OptsBuilder, Pool};
 use mysql::*;
 use num::Signed;
@@ -28,7 +28,6 @@ fn handle_p3(mut stream: TcpStream) -> i8 {
 }
 
 fn main() {
-
     let client_address = "127.0.0.1:8080"; // Assuming p2 is listening on port 8082
 
     let p2_address = "127.0.0.1:80822"; // Assuming p2 is listening on port 8082
@@ -46,21 +45,17 @@ fn main() {
                 let p3_stream = stream.try_clone().unwrap();
 
                 // Spawn separate threads for P2 and P3
-                let r2_handle = thread::spawn(move || {
-                    handle_p2(p2_stream)
-                });
+                let r2_handle = thread::spawn(move || handle_p2(p2_stream));
 
-                let r3_handle = thread::spawn(move || {
-                    handle_p3(p3_stream)
-                });
+                let r3_handle = thread::spawn(move || handle_p3(p3_stream));
 
                 // Wait for both threads to finish and get their results
                 let r2 = r2_handle.join().unwrap();
                 let r3 = r3_handle.join().unwrap();
-println!("recieve r2,r3 from p2 and p3 : {:?},{:?}",r2,r3);
+                println!("recieve r2,r3 from p2 and p3 : {:?},{:?}", r2, r3);
                 // Perform computation on r2 and r3
                 let result = (r2 != 0 && r2 / r3 >= 0) as bool;
-                
+
                 let byte_value: u8 = if result { 1 } else { 0 };
 
                 // Send the result back to the client

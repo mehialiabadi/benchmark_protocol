@@ -84,14 +84,17 @@ fn send_shared_truthtable_to_parties(address: &str, table: Vec<Vec<i8>>, id: i32
     //     .expect("Failed to write to stream row id");
 
     let json_string = serde_json::to_string(&table).unwrap();
+    let json_row = serde_json::to_string(&id).unwrap();
 
     // let serialized_table: Vec<u8> = serialize(&table).expect("Failed to serialize table");
     // let json_string: String = serde_json::to_string(&table)?;
 
     stream
         .write_all(&json_string.as_bytes())
-        .expect("Failed to write to stream");
-
+        .expect("Failed to write table to stream");
+    stream
+        .write_all(&json_row.as_bytes())
+        .expect("Failed to write row id to stream");
     // writer.flush().expect("Failed to flush stream");
 }
 
@@ -123,6 +126,7 @@ fn handle_client_connection(mut stream: TcpStream) {
         .read_exact(&mut buffer_integer)
         .expect("Failed to read table data");
     let user_number = i32::from_be_bytes(buffer);
+    
     let smt = raw_value(&pool, user_number, column_name);
 
     for row in smt.iter().flatten() {

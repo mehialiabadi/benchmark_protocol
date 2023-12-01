@@ -27,18 +27,24 @@ struct Table {
     rows: [[i8; 8]; 2],
 }
 
-fn generate_random_table(distance:i8) -> Table {
+
+
+
+// Print the random table
+
+// Helper function to generate a random row
+
+
+fn generate_random_table(distance:i8) -> Vec<Vec<i8>>{
     let mut rng = rand::thread_rng();
-    let rows: Vec<Vec<i32>> = (0..2)
+    let random_table= (0..2)
     .map(|_| (0..8).map(|_| rng.gen_range(1..100)).collect())
     .collect();
-
-Table {rows:[[0; 8]; 2]}
-
+return random_table;
 }
 
 
-pub fn generate_truth_table( number:i32,distance:i8) -> (Table,Table){
+pub fn generate_truth_table( number:i32,distance:i8) -> (Vec<Vec<i8>>,Vec<Vec<i8>>){
     
     let binary_number:&str=&format!("{number:08b}");
     println!("binary:{:?}",binary_number);
@@ -50,7 +56,7 @@ pub fn generate_truth_table( number:i32,distance:i8) -> (Table,Table){
 
     for (index1, bit) in binary_number.chars().enumerate() {
         if bit == '0' {
-            let row = p3_table.rows.get_mut(1);
+            let row = p3_table.get_mut(1);
            
             if let Some(element) = row.expect("REASON").get_mut(index1) {
                 *element = *element - my_variable;
@@ -59,13 +65,13 @@ pub fn generate_truth_table( number:i32,distance:i8) -> (Table,Table){
             }
         }
         if bit=='1'{
-        let row = p3_table.rows.get_mut(0);
+        let row = p3_table.get_mut(0);
         if let Some(element) = row.expect("REASON").get_mut(index1) {
             *element = *element - my_variable;
         }
             }
         }
-   return  (p2_table, Table { rows: p3_table.rows });
+   return  (p2_table, p3_table);
 }
 fn raw_value(pool:&Pool,user_number:i32,column_name:&str)->Result<Vec<LineItem>, mysql::Error>{
     let mut conn = pool.get_conn().unwrap();
@@ -87,7 +93,7 @@ fn process_row(id:i32, order_key:i32, user_number:i32)->(i32,i32){
     
 }
 
-fn send_shared__truthtable_to_parties(address:&str, table: Table,id:i32) {
+fn send_shared__truthtable_to_parties(address:&str, table: Vec<Vec<i8>>,id:i32) {
 
         let mut stream = TcpStream::connect(address).unwrap();
         stream.write_all(b"p1").expect("Failed to send server identifier");

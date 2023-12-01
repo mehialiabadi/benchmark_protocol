@@ -51,7 +51,7 @@ struct Table {
 //   }
      
 
-     fn p2_computaion(truth_table: &mut Table, binary_p2number: &str) -> (i8,i8){
+     fn p2_computaion(truth_table: &mut Vec<Vec<i8>>, binary_p2number: &str) -> (i8,i8){
         #![feature(int_roundings)]
         // let mut truth_table1:Vec<Vec<i32>>= truth_table;
     
@@ -61,7 +61,7 @@ struct Table {
     
                 for (index, character) in binary_p2number.chars().enumerate() {
                     if character == '0' {
-                        let row = truth_table.rows.get_mut(1);
+                        let row = truth_table.get_mut(1);
            
                         if let Some(element) = row.expect("REASON").get_mut(index) {
                         
@@ -73,7 +73,7 @@ struct Table {
         
                     else{
                   
-                        let row = truth_table.rows.get_mut(0);
+                        let row = truth_table.get_mut(0);
            
                         if let Some(element) = row.expect("REASON").get_mut(index) {
                         
@@ -95,7 +95,7 @@ fn send_result_to_parties(mut stream_p: &TcpStream, result: i8,row_id:i32) {
     // Read bytes from the stream
 /// ///
 
-fn handle_p1_connection(mut stream: TcpStream,sender: Sender<Table>) {
+fn handle_p1_connection(mut stream: TcpStream,sender: Sender<Vec<Vec<i8>>>) {
     // println!("data from p1");
     let mut server_identifier = [0; 2];
     stream.read_exact(&mut server_identifier).expect("Failed to read from p1 identifier");
@@ -107,7 +107,7 @@ let mut buffer_table = Vec::new();
     stream.read_to_end(&mut buffer_table).expect("Failed to read from stream");
 
    
- let deserialized_table: Table = deserialize(&buffer_table).expect("Failed to deserialize table");
+ let deserialized_table: Vec<Vec<i8>> = deserialize(&buffer_table).expect("Failed to deserialize table");
  sender.send(deserialized_table).expect("Failed to send result to main thread");
 
  let mut buff_integer=[0;4];
@@ -169,7 +169,7 @@ fn start_p2(server_address: &str) {
 
             println!("this is the integer value from client:{:?}",user_num);
          let handle2=   thread::spawn(|| handle_p1_connection(p1_stream,sender2));
-         let mut tab = receiver2.recv().expect("Failed to receive table from thread 1");
+         let mut tab: Vec<Vec<i8>> = receiver2.recv().expect("Failed to receive table from thread 1");
 println!("table:{:?}",tab);
 p2_computaion(&mut tab,&user_num.to_string() );
 handle1.join().unwrap();

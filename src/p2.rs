@@ -18,7 +18,7 @@ use std::sync::mpsc::{channel, Sender};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Table {
-    rows: [[u8; 8]; 2],
+    rows: [[i8; 8]; 2],
 }
 // pub fn p2_process(pool:&Pool,truth_table: &mut Vec<Vec<u8>>,row_id:i32)->(i8,i8){
 //     let column_name="order_key";
@@ -90,6 +90,11 @@ fn send_result_to_parties(mut stream_p: &TcpStream, result: i8,row_id:i32) {
     stream_p.write_all(&row_id.to_be_bytes()).unwrap();
 
 }
+///
+/// fn read_table_from_stream<T: Read>(stream: &mut T) -> Result<Table> {
+    // Read bytes from the stream
+/// ///
+
 fn handle_p1_connection(mut stream: TcpStream,sender: Sender<Table>) {
     // println!("data from p1");
     let mut server_identifier = [0; 2];
@@ -104,6 +109,13 @@ let mut buffer_table = Vec::new();
    
  let deserialized_table: Table = deserialize(&buffer_table).expect("Failed to deserialize table");
  sender.send(deserialized_table).expect("Failed to send result to main thread");
+
+ let mut buff_integer=[0;4];
+ stream.read_exact(&mut buff_integer).expect("...");
+ let row_id= i32::from_be_bytes(buff_integer);
+ println!("row id{:?}",row_id);
+//  sender.send(row_id).expect("Failed to send result to main thread");
+
 
 //  println!("table:{:?}",&deserialized_table);
         }
@@ -130,7 +142,6 @@ fn handle_client_connection(mut stream: TcpStream,sender: Sender<i32>) {
     let integer_value= i32::from_be_bytes(integer_buffer);
     sender.send(integer_value).expect("Failed to send result to main thread");
 
-    println!("p2 received integer from client: {:?}", integer_value);
         }
         _ => {
             println!("Unexpected server identifier expect c1: {}", server_identifier);

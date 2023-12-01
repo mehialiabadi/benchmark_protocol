@@ -24,13 +24,13 @@ pub struct LineItem {
 }
 #[derive(Serialize, Deserialize, Debug,Clone)]
 struct Table {
-    rows: [[u8; 8]; 2],
+    rows: [[i8; 8]; 2],
 }
 
 fn generate_random_table(distance:i8) -> Table {
     let mut rng = rand::thread_rng();
-    let rows: Vec<Vec<u8>> = (0..2)
-    .map(|_| (0..8).map(|_| rng.gen_range(0..100)).collect())
+    let rows: Vec<Vec<i32>> = (0..2)
+    .map(|_| (0..8).map(|_| rng.gen_range(1..100)).collect())
     .collect();
 
 Table {rows:[[0; 8]; 2]}
@@ -46,7 +46,7 @@ pub fn generate_truth_table( number:i32,distance:i8) -> (Table,Table){
    let mut p2_table= generate_random_table(distance);
 
    let mut p3_table = p2_table.clone();
-    let my_variable: u8 = 1;
+    let my_variable: i8 = 1;
 
     for (index1, bit) in binary_number.chars().enumerate() {
         if bit == '0' {
@@ -54,6 +54,8 @@ pub fn generate_truth_table( number:i32,distance:i8) -> (Table,Table){
            
             if let Some(element) = row.expect("REASON").get_mut(index1) {
                 *element = *element - my_variable;
+                // *element = *element.wrapping_sub(my_variable);
+
             }
         }
         if bit=='1'{
@@ -108,12 +110,12 @@ fn start_p1(server_address: &str) {
     for stream in listener.incoming() {
         if let Ok(stream) = stream {
             // Spawn a new thread to handle each client
-            thread::spawn(move || handle_client(stream));
+            thread::spawn(move || handle_client_connection(stream));
         }
     }
 }
 
-fn handle_client(mut stream: TcpStream) {
+fn handle_client_connection(mut stream: TcpStream) {
     let mut buffer = [0; 4]; // Adjust buffer size as needed
     let url = "mysql://root:123456789@localhost:3306/testdb";
     let pool = Pool::new(url).unwrap();
@@ -134,7 +136,8 @@ let  p2_address="127.0.0.1:9092";
         let  smt=raw_value(&pool,user_number,column_name);
 
         for row in smt.iter().flatten() {
-         let new_value=(row.column_value-user_number).abs();
+         let new_value = (row.column_value.wrapping_sub(user_number)).abs();
+
          let (p2_share_table,p3_share_table) = generate_truth_table(new_value,distance);
 
          println!("p2 truth table {:?} p3share truth table:{:?} for row id:{:?}, and new value {:?}",p2_share_table,p3_share_table,row.id,new_value);

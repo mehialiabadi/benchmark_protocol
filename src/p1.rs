@@ -1,32 +1,44 @@
 use std::hash::BuildHasher;
-use std::net::{TcpStream, SocketAddr};
-use std::io::{Read, Write};
+use std::net::{TcpStream, SocketAddr, TcpListener};
+use std::io::{Read, Write, BufWriter};
 use rand::Rng;
 use rusqlite::{Connection, Result, NO_PARAMS};
 use mysql::prelude::*;
 // use mysql::{OptsBuilder, Pool};
 use mysql::*;
 use num::Signed;
-use std::net::TcpListener;
+use serde::{Serialize, Deserialize};
+// suse std::net::TcpListener;
 use std::io::{self};
 use std::thread;
 use byteorder::{LittleEndian, ReadBytesExt};
+use bincode::serialize;
+
+
 
 
 
 pub struct LineItem {
     id:i32,
     column_value: i32,
-
-  
 }
-fn generate_random_table(distance:i8) -> Vec<Vec<u8>> {
+#[derive(Serialize, Deserialize, Debug,Clone)]
+struct Table {
+    rows: Vec<Vec<u8>>,
+}
+
+fn generate_random_table(distance:i8) -> Table {
     let mut rng = rand::thread_rng();
-    (0..2).map(|_| (0..distance).map(|_| rng.gen_range(1..100)).collect()).collect()
+    let rows: Vec<Vec<u8>> = (0..2)
+    .map(|_| (0..8).map(|_| rng.gen_range(0..100)).collect())
+    .collect();
+
+Table { rows }
+
 }
 
 
-pub fn generate_truth_table( number:i32,distance:i8) -> (Vec<Vec<u8>> ,Vec<Vec<u8>>){
+pub fn generate_truth_table( number:i32,distance:i8) -> (Table,Table){
     
     let binary_number:&str=&format!("{number:08b}");
     println!("binary:{:?}",binary_number);
@@ -38,20 +50,20 @@ pub fn generate_truth_table( number:i32,distance:i8) -> (Vec<Vec<u8>> ,Vec<Vec<u
 
     for (index1, bit) in binary_number.chars().enumerate() {
         if bit == '0' {
-            let row = p3_table.get_mut(1);
+            let row = p3_table.rows.get_mut(1);
            
             if let Some(element) = row.expect("REASON").get_mut(index1) {
                 *element = *element - my_variable;
             }
         }
         if bit=='1'{
-        let row = p3_table.get_mut(0);
+        let row = p3_table.rows.get_mut(0);
         if let Some(element) = row.expect("REASON").get_mut(index1) {
             *element = *element - my_variable;
         }
             }
         }
-   return  (p2_table, p3_table.to_vec());
+   return  (p2_table, Table { rows: p3_table.rows.to_vec() });
 }
 fn raw_value(pool:&Pool,user_number:i32,column_name:&str)->Result<Vec<LineItem>, mysql::Error>{
     let mut conn = pool.get_conn().unwrap();
@@ -76,7 +88,7 @@ fn process_row(id:i32, order_key:i32, user_number:i32)->(i32,i32){
     
 }
 
-fn send_shared__truthtable_to_parties(address:&str, table: Vec<Vec<u8>>,id:i32) {
+fn send_shared__truthtable_to_parties(address:&str, table: Table,id:i32) {
 
         let mut stream = TcpStream::connect(address).unwrap();
         stream.write_all(b"p1").expect("Failed to send server identifier");
@@ -86,11 +98,17 @@ fn send_shared__truthtable_to_parties(address:&str, table: Vec<Vec<u8>>,id:i32) 
     // // Send the serialized table over the stream
     // stream.write_all(serialized_table.as_bytes()).expect("Failed to write to client");
 
-    let serialized_table = bincode::serialize(&table).unwrap();
+    // let serialized_table = bincode::serialize(&table).unwrap();
     // // println!("serialize table:{:?}",serialized_table);
     // // println!("deseialized table:{:?}",bincode::serialize(&serialized_table).unwrap());
     // // stream.write_all(&id.to_be_bytes()).unwrap();
-    stream.write_all(&serialized_table).unwrap();
+    // println!("serialized data:{:?}",serialized_table);
+    let serialized_table = serialize(&table).expect("Failed to serialize table");
+    let mut writer = BufWriter::new(stream.try_clone().expect("Failed to clone stream"));
+
+    writer.write_all(&serialized_table).expect("Failed to write to stream");
+    // writer.flush().expect("Failed to flush stream");
+
 
 
   
@@ -118,11 +136,11 @@ let  p2_address="127.0.0.1:9092";
  let p3_address="127.0.0.1:8083";
 
  let mut server_identifier = [0; 2];
- stream.read_exact(&mut server_identifier).expect("Failed to read from p1 identifier");
+ stream.read_exact(&mut server_identifier).expect("Failed to read from client identifier");
   let server_identifier:&str= &String::from_utf8_lossy(&server_identifier).to_string();
   match &server_identifier {
     &"c1" => {
-        let mut buffer_integer = [0; 4 ]; // 4 bytes for each element in a 2x8 table
+        let mut buffer_integer = [0; 4 ];// 4 bytes for 32 bits
         stream.read_exact(&mut buffer_integer).expect("Failed to read table data");
         let user_number= i32::from_be_bytes(buffer);
         let  smt=raw_value(&pool,user_number,column_name);

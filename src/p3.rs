@@ -16,7 +16,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 //     column_value: i32,
   
 // }
-pub fn p3_process(pool:&Pool,truth_table: &mut Vec<Vec<i32>>,row_id:i32)->(i8,i8){
+pub fn p3_process(pool:&Pool,truth_table: &mut Vec<Vec<u8>>,row_id:i32)->(i8,i8){
     let column_name="order_key";
 
     let mut conn = pool.get_conn().unwrap();
@@ -48,7 +48,7 @@ pub fn p3_process(pool:&Pool,truth_table: &mut Vec<Vec<i32>>,row_id:i32)->(i8,i8
   }
      
 
-     fn p3_computaion(truth_table: &mut Vec<Vec<i32>>, binary_p2number: &str) -> (i8,i8){
+     fn p3_computaion(truth_table: &mut Vec<Vec<u8>>, binary_p2number: &str) -> (i8,i8){
         #![feature(int_roundings)]
     
     let mut capital_s2:i32=0;
@@ -59,14 +59,14 @@ pub fn p3_process(pool:&Pool,truth_table: &mut Vec<Vec<i32>>,row_id:i32)->(i8,i8
                 for (index, character) in binary_p2number.chars().enumerate() {
                     if character == '0' {
                 
-                    capital_s2+=truth_table[1][index];
+                    capital_s2+=truth_table[1][index] as i32;
         
                     
                     }
         
                     else{
                   
-                    capital_s2+=truth_table[0][index];
+                    capital_s2+=truth_table[0][index] as i32;
                 }
             }
             small_s2=(capital_s2/8) as i8;

@@ -7,16 +7,22 @@ use mysql::prelude::*;
 // use mysql::{OptsBuilder, Pool};
 use mysql::*;
 use num::Signed;
+use serde::{Deserialize, Serialize};
 use std::net::TcpListener;
 use std::thread;
 use byteorder::{LittleEndian, ReadBytesExt};
+use bincode::{serialize, deserialize};
 
 // pub struct LineItem {
 //     id:i32,
 //     column_value: i32,
   
 // }
-pub fn p2_process(pool:&Pool,truth_table: &mut Vec<Vec<i32>>,row_id:i32)->(i8,i8){
+#[derive(Serialize, Deserialize, Debug)]
+struct Table {
+    rows: Vec<Vec<u8>>,
+}
+pub fn p2_process(pool:&Pool,truth_table: &mut Vec<Vec<u8>>,row_id:i32)->(i8,i8){
     let column_name="order_key";
 
     let mut conn = pool.get_conn().unwrap();
@@ -48,25 +54,24 @@ pub fn p2_process(pool:&Pool,truth_table: &mut Vec<Vec<i32>>,row_id:i32)->(i8,i8
   }
      
 
-     fn p2_computaion(truth_table: &mut Vec<Vec<i32>>, binary_p2number: &str) -> (i8,i8){
+     fn p2_computaion(truth_table: &mut Vec<Vec<u8>>, binary_p2number: &str) -> (i8,i8){
         #![feature(int_roundings)]
     
     let mut capital_s2:i32=0;
-        let mut small_s2: i8;
+        let mut small_s2: i8=0;
         let mut r2=0;
     
-    let modulue=32;
                 for (index, character) in binary_p2number.chars().enumerate() {
                     if character == '0' {
                 
-                    capital_s2+=truth_table[1][index];
+                    capital_s2+=truth_table[1][index] as i32;
         
                     
                     }
         
                     else{
                   
-                    capital_s2+=truth_table[0][index];
+                    capital_s2+=truth_table[0][index] as i32;
                 }
             }
             small_s2=(capital_s2/8) as i8;
@@ -89,15 +94,21 @@ fn handle_p1_connection(mut stream: TcpStream) {
         &"p1" => {
             // let mut buffer_new = Vec::new();
 
-            let mut buffer_table = [0; 16]; // 1 bytes for each element in a 2x8 table
+            //  let mut buffer_table = [0; 8]; // 1 bytes for each element in a 2x8 table
             // stream.read_exact(&mut buffer_table).expect("Failed to read table data");
             // let table_data = String::from_utf8_lossy(&buffer_table);
 
             // // Data is an integer from Server 1
             // let table: serde_json::Value = serde_json::from_str(&table_data.trim()).expect("Failed to deserialize table");
-            stream.read_exact(&mut buffer_table).unwrap();
-             let  mut received_table: Vec<Vec<u8>> = bincode::deserialize(&buffer_table).unwrap();
-println!("table:{:?}",received_table);
+//             stream.read_exact(&mut buffer_table).unwrap();
+//              let  mut received_table: Vec<Vec<u8>> = bincode::deserialize(&buffer_table).unwrap();
+// println!("table:{:?}",received_table);
+let mut buffer_table = Vec::new();
+    stream.read_to_end(&mut buffer_table).expect("Failed to read from stream");
+
+    // Deserialize the received binary data into a Table using bincode
+    let deserialized_table: Table = deserialize(&buffer_table).expect("Failed to deserialize table");
+println!("table:{:?}",deserialized_table);
             // Process the deserialized table (replace this with your actual processing logic)
         }
         _ => {
@@ -186,7 +197,7 @@ fn handle_client(mut stream: TcpStream) {
 
 
 
-                let mut buffer_table = [0; 4 * 32 * 2]; // 4 bytes for each element in a 2x8 table
+                let mut buffer_table = [0; 16]; // 4 bytes for each element in a 2x8 table
                 stream.read_exact(&mut buffer_table).unwrap();
                 let  mut received_table: Vec<Vec<i32>> = bincode::deserialize(&buffer_table).unwrap();
                 println!("table p2:{:?}",received_table);

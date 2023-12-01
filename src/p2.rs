@@ -108,7 +108,7 @@ fn handle_p1_connection(mut stream: TcpStream, sender: Sender<Vec<Vec<i8>>>) {
     //     .expect("Failed to read from stream");
     let mut buffer = String::new();
 
-    stream.read_to_string(&mut buffer);
+    let _ = stream.read_to_string(&mut buffer);
     // if let Ok(table) = serde_json::from_str(&buffer_table) {
     //     sender
     //         .send(table)
@@ -175,22 +175,22 @@ fn start_p2(server_address: &str) {
     }
 }
 
-fn handle_client(mut stream: TcpStream) {
-    let mut buffer = [0; 4]; // Adjust buffer size as needed
+// fn handle_client(mut stream: TcpStream) {
+//     let mut buffer = [0; 4]; // Adjust buffer size as needed
 
-    stream.read_exact(&mut buffer).unwrap();
+//     stream.read_exact(&mut buffer).unwrap();
 
-    let integer_value = i32::from_be_bytes(buffer);
-    println!("p2 received in integer format: {:?}", integer_value);
+//     let integer_value = i32::from_be_bytes(buffer);
+//     println!("p2 received in integer format: {:?}", integer_value);
 
-    let mut buffer_table = [0; 16]; // 4 bytes for each element in a 2x8 table
-    stream.read_exact(&mut buffer_table).unwrap();
-    let mut received_table: Table = bincode::deserialize(&buffer_table).unwrap();
-    println!("table p2:{:?}", received_table);
-}
+//     let mut buffer_table = [0; 16]; // 4 bytes for each element in a 2x8 table
+//     stream.read_exact(&mut buffer_table).unwrap();
+//     let mut received_table: Table = bincode::deserialize(&buffer_table).unwrap();
+//     println!("table p2:{:?}", received_table);
+// }
 
 fn main() {
-    let url = "mysql://root:123456789@localhost:3306/testdb";
+    let url = "mysql://root@localhost:3306/testdb";
     let pool = Pool::new(url).unwrap();
     // let table_name="line_item_1m";
     let table_name = "p2share_test";

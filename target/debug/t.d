@@ -1,1 +1,1 @@
-/Users/mehri/Desktop/fall\ 2023\ terms/prof\ Sharma\ papers/Comparison/benchmark_protocol/target/debug/t: /Users/mehri/Desktop/fall\ 2023\ terms/prof\ Sharma\ papers/Comparison/benchmark_protocol/src/truthtable.rs
+/Users/neo/Documents/playground/benchmark_protocol/target/debug/t: /Users/neo/Documents/playground/benchmark_protocol/src/truthtable.rs

@@ -6,12 +6,7 @@ use std::io::{BufWriter, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 // use mysql::{OptsBuilder, Pool};
 use mysql::*;
-use num::Signed;
 use serde::{Deserialize, Serialize};
-// suse std::net::TcpListener;
-use bincode::serialize;
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{self};
 use std::thread;
 
 pub struct LineItem {

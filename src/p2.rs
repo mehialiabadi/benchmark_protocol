@@ -301,6 +301,7 @@ fn set_share(inp: i32) -> i32 {
 }
 fn send_result_to_parties(server_addr: &str, data: &String) {
     // let serialized_result = bincode::serialize(&result).unwrap();
+    println!("send to p4:{:?}", data);
 
     let mut stream = TcpStream::connect(server_addr).unwrap();
     // let json_user = serde_json::to_string(&data).unwrap();

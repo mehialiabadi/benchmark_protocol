@@ -140,7 +140,18 @@ fn handle_client(stream: TcpStream, sender: Sender<Message>) {
 //         Message::NoData => None,
 //     }
 // }
-
+fn p4_prepare(data: &Message) -> Option<Partyr> {
+    match data {
+        Message::Data(data) => {
+            let r: Result<Partyr, serde_json::Error> = serde_json::from_str(data);
+            match r {
+                Ok(party) => return Some(party),
+                _ => None,
+            }
+        }
+        Message::NoData => None,
+    }
+}
 fn start_p4(server_address: &str) {
     let url = "mysql://root:123456789@localhost:3306/testdb";
     let pool = Pool::new(url).unwrap();
@@ -166,27 +177,20 @@ fn start_p4(server_address: &str) {
             //             // Spawn separate threads for P2 and P3
             let r2_handle = thread::spawn(move || handle_p2(p2_stream, sender1_clone));
             let mut data_rec = receiver1.recv().expect("Failed handle1 thread 1");
-            println!("raw data is here-{:?}", data_rec);
-            // let r: Result<Partyr, serde_json::Error> = serde_json::from_str(&data_rec.to_string());
-            let data_recieved: P4paylod = serde_json::from_str(&data_rec.to_string()).unwrap();
-
-            for party in data_recieved.iter() {
-                println!("Row ID: {}- com{:?}", party.row_id, party.comput);
+            println!("raw---{:?}", data_rec);
+            if let Some(res) = p4_prepare(&data_rec) {
+                match res {
+                    Partyr => {
+                        println!("Row ID: {}, Comput: {}", Partyr.row_id, Partyr.comput);
+                    }
+                }
             }
 
-            // Handling the result
-            // match result {
-            //     Ok(payload) => {
-            //         println!("Row ID: {}, Comput: {}", payload.row_id, payload.comput);
-            //     }
-            //     Err(err) => {
-            //         eprintln!("Error during deserialization: {}", err);
-            //     }
-            // }
             // process_data(data_recieved);
         }
     }
 }
+
 fn main() {
     // let client_address = "127.0.0.1:8080"; // Assuming p2 is listening on port 8082
 

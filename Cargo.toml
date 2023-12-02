@@ -34,7 +34,7 @@ path = "src/p3.rs"
 
 [[bin]]
 name = "p4"
-path = "src/p4.rs"
+path = "src/cordinator.rs"
 
 [[bin]]
 name = "main"

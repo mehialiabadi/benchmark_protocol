@@ -116,7 +116,7 @@ fn main() {
 
     let client_address = "127.0.0.1:8080";
     let p1_address = "127.0.0.1:8081";
-    let p2_address = "127.0.0.1:9092";
+    let p2_address = "127.0.0.1:8082";
     let p3_address = "127.0.0.1:8083";
     let listener_client = TcpListener::bind(client_address).unwrap();
     println!("client is listening  on port 8080");
@@ -138,12 +138,12 @@ fn main() {
 
     let handle1 = thread::spawn(move || send_data_to_p1(p1_address, p1_share.to_string()));
     let handle2 = thread::spawn(move || send_data_to_p2(p2_address, p23_share.to_string()));
-    // let handle3 = thread::spawn(move || send_data_to_p2(p3_address, &p23_share));
+    let handle3 = thread::spawn(move || send_data_to_p2(p3_address, p23_share.to_string()));
 
     // Wait for three threads to finish
     handle1.join().unwrap().expect("Error in thread 1");
     handle2.join().unwrap().expect("Error in thread 1");
-    // handle3.join().unwrap().expect("Error in thread 1");
+    handle3.join().unwrap().expect("Error in thread 1");
     //////
     // println!("if data send to clients");
 

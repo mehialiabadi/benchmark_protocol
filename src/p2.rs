@@ -4,7 +4,6 @@ use rand::Rng;
 use rusqlite::{Connection, Result, NO_PARAMS};
 use serde_json::json;
 use std::io::{self, Read, Write};
-use std::net::{SocketAddr, TcpStream};
 use std::num::ParseIntError;
 use std::ops::ShlAssign;
 use std::option;
@@ -15,11 +14,11 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use mysql::*;
 use num::Signed;
 use serde::{Deserialize, Serialize};
-use std::net::TcpListener;
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
-use benchmark_protocol::table::Table;
+use benchmark_protocol::table::{Partyr, Table};
 
 enum Payload {
     Int(usize),
@@ -82,12 +81,13 @@ fn handle_client(stream: TcpStream, sender: Sender<Message>) {
 //     serde_json::from_str::<MessageType>(&buffer)
 //         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
 // }
-pub fn p2_process(
+
+pub fn process_table(
     pool: &Pool,
     truth_table: &mut Vec<Vec<i8>>,
-    row_id: &i32,
-    shared: i8,
-) -> (i8, i8, i32) {
+    row_id: &usize,
+    shared: usize,
+) -> (i32, i32) {
     let column_name = "order_key";
 
     let mut conn = pool.get_conn().unwrap();
@@ -99,7 +99,7 @@ pub fn p2_process(
     // let query = qu2+"from p1test_share where id=".to_owned()+&row_id.to_string();
     // let query = qu+"from p1test_share where";
 
-    let query = format!("SELECT id, order_key FROM p1test_share  WHERE id = :id",);
+    let query = format!("SELECT id, order_key FROM p2test_share  WHERE id = :id",);
 
     // // Execute the query with parameters
     // let result: Option<(i32, i32)> = conn.query_first(
@@ -116,102 +116,39 @@ pub fn p2_process(
 
     if let Some((id, column_value)) = result {
         println!("id: {}, value: {}", id, column_value);
-        let bin: String = format!("{:08b}", (column_value.wrapping_sub(shared.into())).abs());
+        let bin: String = format!(
+            "{:08b}",
+            (column_value.wrapping_sub(shared.try_into().unwrap())).abs()
+        );
 
-        let (s2, r2, row_num) = p2_computaion(truth_table, &bin, *row_id);
-        return (s2, r2, *row_id);
+        let (s2, r2) = p2_computaion(truth_table, &bin);
+        return (s2, r2);
     } else {
         println!("No matching row found");
-        return (0, 0, *row_id);
+        return (0, 0);
     }
-    fn p2_computaion(
-        truth_table: &mut Vec<Vec<i8>>,
-        binary_p2number: &str,
-        row_id: i32,
-    ) -> (i8, i8, i32) {
+    fn p2_computaion(truth_table: &mut Vec<Vec<i8>>, binary_p2number: &str) -> (i32, i32) {
         #![feature(int_roundings)]
 
         let mut capital_s2: i32 = 0;
-        let mut small_s2: i8;
+        let mut small_s2: i32;
         let mut r2 = 0;
         println!("binary:{:?}", binary_p2number);
         let modulue = 32;
         for (index, character) in binary_p2number.chars().enumerate() {
-            println!("index:{:?}", index);
             if character == '0' {
                 capital_s2 += truth_table[1][index] as i32;
+                println!("element:{:?}", truth_table[1][index]);
             } else {
                 capital_s2 += truth_table[0][index] as i32;
+                println!("element:{:?}", truth_table[0][index]);
             }
         }
-        small_s2 = (capital_s2 / 8) as i8;
+        small_s2 = (capital_s2 / 8) as i32;
         r2 = capital_s2 % 8;
-        return ((small_s2 as f32).floor() as i8, r2 as i8, row_id);
+        println!("capital S2:{:?}", capital_s2);
+        return ((small_s2 as f32).floor() as i32, r2 as i32);
     }
-}
-fn p2_get_share(data: Message, mut flag: bool) -> i32 {
-    if (flag == true) {
-        let nn = data.last_char();
-        let row_id = nn.unwrap();
-        flag = false;
-        return row_id as i32;
-    } else {
-        return 0;
-    }
-}
-// #![feature(int_roundings)]
-fn p2_prepar_enext(data: &Message) -> (Vec<Vec<i8>>, i32) {
-    let mut res = "";
-    let mut id = 0;
-    // println!("raw data:{:?}", &data);
-    // let nn: &Option<char> = &data.last_char();
-    let d = data.to_string();
-    if let Some(index) = d.find("]]") {
-        // Extract the substring starting from the index after "]]"
-        let result = &d[index + 2..];
-        println!("Extracted result: {}", result);
-        res = result;
-    } else {
-        println!("Pattern ']]' not found in the string");
-    }
-
-    if let Ok(parsed_number) = res.parse::<i32>() {
-        // Successfully parsed, use the integer
-        println!("Parsed number: {}", parsed_number);
-        id = parsed_number;
-    } else {
-        // Parsing failed, handle the error
-        println!("Failed to parse the string as an integer");
-    }
-    // let rowid = match nn {
-    //     Some(ch) => ch,
-    //     None => &'0', // Replace with the default value or handle the None case
-    // };
-    // println!("rowid:{:?}", rowid);
-    // id = *rowid as i32;
-    // let row_id = nn.unwrap() as i32;
-
-    // println!("nn:{:?}", nn);
-
-    let arrays_part = &data.to_string();
-    let x2 = arrays_part.trim_start_matches('[').trim_end_matches(']');
-    let arrays: Vec<&str> = x2.split("],[").collect();
-
-    // Convert each array string to Vec<i8>
-    let result: Vec<Vec<i8>> = arrays
-        .iter()
-        .map(|array_str| {
-            array_str
-                .split(',')
-                .filter_map(|num_str| num_str.parse::<i8>().ok())
-                .collect()
-        })
-        .collect();
-    // let my_char_ref: &char = &rowid;
-
-    // Convert &char to i32
-    // println!("roooow:{:?}", id);
-    return (result, id);
 }
 
 fn p2_prepare(data: &Message) -> Option<Payload> {
@@ -362,42 +299,66 @@ fn handle_client_connection(mut stream: TcpStream, sender: Sender<String>) {
 fn set_share(inp: i32) -> i32 {
     return inp;
 }
-fn send_result_to_parties(mut stream_p: &TcpStream, result: i8, row_id: i32) {
+fn send_result_to_parties(server_addr: &str, data: &String) {
     // let serialized_result = bincode::serialize(&result).unwrap();
-    stream_p.write_all(&result.to_be_bytes()).unwrap();
-    stream_p.write_all(&row_id.to_be_bytes()).unwrap();
+
+    let mut stream = TcpStream::connect(server_addr).unwrap();
+    // let json_user = serde_json::to_string(&data).unwrap();
+    let bytes = serde_json::to_string(&data).unwrap();
+
+    stream
+        .write_all(&bytes.as_bytes())
+        .expect("Failed to write table to stream");
 }
+
 fn start_p2(server_address: &str) {
-    // let url = "mysql://root:123456789@localhost:3306/testdb";
-    // let pool = Pool::new(url).unwrap();
+    let url = "mysql://root:123456789@localhost:3306/testdb";
+    let pool = Pool::new(url).unwrap();
     // let mut row_id = 0;
     let listener = TcpListener::bind(server_address).expect("Failed to bind");
 
     let (sender1, receiver1) = channel();
-    let (sender2, receiver2) = channel();
+    // let (sender2, receiver2) = channel();
     let client_address = "127.0.0.1:8080"; // Assuming p2 is listening on port 8082
 
     let p4_address = "127.0.0.1:8084"; // Assuming p4 is listening on port 8084
-
-    let mut share_value = 0;
+    let mut cleint_share = 0;
     for stream in listener.incoming() {
         if let Ok(stream) = stream {
             // Clone the stream for each thread
-            let rec1_clone = sender1.clone();
+            let sender1_clone = sender1.clone();
             // let rec2_clone = sender2.clone();
             // let (thread_sender, thread_receiver) = channel();
 
             // Spawn threads to handle each server connection
-            let handle1 = thread::spawn(|| handle_client(stream, rec1_clone));
-            let mut user_num = receiver1.recv().expect("Failed handle1 thread 1");
+            let handle1 = thread::spawn(|| handle_client(stream, sender1_clone));
+            let mut data_rec = receiver1.recv().expect("Failed handle1 thread 1");
 
-            if let Some(res) = p2_prepare(&user_num) {
+            if let Some(res) = p2_prepare(&data_rec) {
                 match res {
                     Payload::Int(i) => {
                         println!("integer received {}", i);
+                        cleint_share = i;
                     }
-                    Payload::Table(t) => {
+                    Payload::Table(mut t) => {
                         println!("Table received {:?}", t);
+                        //create own table and send the result to p4 and client
+                        let (s2, r2) = process_table(&pool, &mut t.rows, &t.row_id, cleint_share);
+                        println!("s2:{:?}, r2:{:?}, row:{:?}", s2, r2, t.row_id);
+                        //send result to p4 and client
+
+                        let res_to_p4: Partyr = Partyr {
+                            row_id: (t.row_id),
+                            comput: (r2),
+                        };
+                        let res_to_client: Partyr = Partyr {
+                            row_id: (t.row_id),
+                            comput: (s2),
+                        };
+
+                        // send_result_to_parties(client_address, &res_to_client.to_string());
+                        send_result_to_parties(p4_address, &res_to_p4.to_string());
+                        //
                     }
                 }
             }
@@ -452,15 +413,15 @@ fn start_p2(server_address: &str) {
             // handle2.join().unwrap();
         }
     }
-    match receiver1.recv().unwrap() {
-        Message::Data(data) => println!("Received data from Server 1: {}", data),
-        Message::NoData => println!("No data received from Server 1"),
-    }
+    // match receiver1.recv().unwrap() {
+    //     Message::Data(data) => println!("Received data from Server 1: {}", data),
+    //     Message::NoData => println!("No data received from Server 1"),
+    // }
 
-    match receiver2.recv().unwrap() {
-        Message::Data(data) => println!("Received data from Server 2: {}", data),
-        Message::NoData => println!("No data received from Server 2"),
-    }
+    // match receiver2.recv().unwrap() {
+    //     Message::Data(data) => println!("Received data from Server 2: {}", data),
+    //     Message::NoData => println!("No data received from Server 2"),
+    // }
 }
 
 // fn handle_client(mut stream: TcpStream) {
@@ -485,7 +446,7 @@ fn main() {
     // let column_name = "order_key";
     // let distance = 32;
 
-    let p2_address = "127.0.0.1:9092"; // Assuming p2 is listening on port 8082
+    let p2_address = "127.0.0.1:8082"; // Assuming p2 is listening on port 8082
 
     // let listener = TcpListener::bind(p2_address).unwrap();
     // let  stream_p4 = TcpStream::connect(p4_address).unwrap();

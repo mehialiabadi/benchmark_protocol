@@ -14,11 +14,13 @@ pub struct Partyr {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct P4paylod {
-    pub p4data: [Partyr; 2],
+    pub parties: Vec<Partyr>,
 }
+// impl P4paylod {
+
 impl P4paylod {
-    pub fn iter(&self) -> impl Iterator<Item = &Partyr> {
-        self.p4data.iter()
+    pub fn iter(&self) -> std::slice::Iter<'_, Partyr> {
+        self.parties.iter()
     }
 }
 impl ToString for Partyr {

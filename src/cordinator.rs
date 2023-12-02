@@ -10,7 +10,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::{option, thread};
 // use mysql::{OptsBuilder, Pool};
 use mysql::*;
-use num::Signed;
+use num::{iter, Signed};
 use std::net::TcpListener;
 
 #[derive(Debug)]
@@ -168,32 +168,22 @@ fn start_p4(server_address: &str) {
             let mut data_rec = receiver1.recv().expect("Failed handle1 thread 1");
             println!("raw data is here-{:?}", data_rec);
             // let r: Result<Partyr, serde_json::Error> = serde_json::from_str(&data_rec.to_string());
-            let my_struct: P4paylod = serde_json::from_str(&data_rec.to_string()).unwrap();
-            for party in &my_struct.p4data {
-                println!("Row ID: {}, Comput: {}", party.row_id, party.comput);
+            let data_recieved: P4paylod = serde_json::from_str(&data_rec.to_string()).unwrap();
+
+            for party in data_recieved.iter() {
+                println!("Row ID: {}- com{:?}", party.row_id, party.comput);
             }
 
-            // let party_instance: Partyr = match serde_json::from_str(&data_rec.to_string()) {
-            //     Ok(party) => party,
-            //     Err(e) => {
-            //         eprintln!("Error deserializing Partyr: {}", e);
-            //         return;
+            // Handling the result
+            // match result {
+            //     Ok(payload) => {
+            //         println!("Row ID: {}, Comput: {}", payload.row_id, payload.comput);
             //     }
-            // };
-
-            // println!("----{:?}-----{:?}", r.row_id, r.comput);
-            // if let Some(res) = p4_prepare(&data_rec) {
-            //     match res {
-            //         P4data::ID(i) => {
-            //             println!("row_id  {:?} ", i);
-            //         }
-            //         P4data::Smallr(i) => {
-            //             println!(" r {:?} ", i);
-            //         } // send_result_to_parties(client_address, &res_to_client.to_string());
-            //           // send_result_to_parties(p4_address, &res_to_p4.to_string());
-            //           //
+            //     Err(err) => {
+            //         eprintln!("Error during deserialization: {}", err);
             //     }
             // }
+            // process_data(data_recieved);
         }
     }
 }

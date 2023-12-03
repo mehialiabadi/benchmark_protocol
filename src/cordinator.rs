@@ -176,7 +176,7 @@ fn process_data(parrty1: Option<Partyr>) -> i8 {
     return 1;
 }
 fn start_p4(server_address: &str) {
-    let url = "mysql://root:123456789@localhost:3306/benchdb";
+    let url = "mysql://root:123456789@localhost:3306/testdb";
     let pool = Pool::new(url).unwrap();
     // let mut row_id = 0;
     let listener = TcpListener::bind(server_address).expect("Failed to bind");

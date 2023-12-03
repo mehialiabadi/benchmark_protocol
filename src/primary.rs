@@ -1,10 +1,12 @@
 use benchmark_protocol::table::Table;
-use mysql::{prelude::*, Pool};
+use mysql::{prelude::*, Pool, PooledConn};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
-use std::net::{Shutdown, TcpListener, TcpStream};
+use std::io::{self, Error, Read, Write};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
 use std::time::Instant;
 use std::{result, thread};
 
@@ -17,67 +19,10 @@ enum Message {
     Data(String),
     NoData,
 }
-// fn main() {
-//     let listener = TcpListener::bind("0.0.0.0:8000").unwrap();
-//     // accept connections and process them, spawning a new thread for each one
-//     println!("Server listening on port 8000");
-//     for stream in listener.incoming() {
-//         match stream {
-//             Ok(stream) => {
-//                 println!("New connection: {}", stream.peer_addr().unwrap());
-//                 thread::spawn(move || {
-//                     // connection succeeded
-//                     handle_client(stream)
-//                 });
-//             }
-//             Err(e) => {
-//                 println!("Error: {}", e);
-//                 /* connection failed */
-//             }
-//         }
-//     }
-//     // close the socket server
-//     drop(listener);
-// }
-
-// fn handle_client(mut stream: TcpStream) {
-//     let mut data = [0 as u8; 1024]; // using 50 byte buffer
-
-//     while match stream.read(&mut data) {
-//         Ok(size) => {
-//             if size > 0 {
-//                 println!("data {}", std::str::from_utf8(&data[0..size]).unwrap());
-//             }
-
-//             true
-//         }
-//         Err(_) => {
-//             println!(
-//                 "An error occurred, terminating connection with {}",
-//                 stream.peer_addr().unwrap()
-//             );
-//             stream.shutdown(Shutdown::Both).unwrap();
-//             false
-//         }
-//     } {}
-// }
-
-// use rusqlite::{Connection, Result, NO_PARAMS};
-// use std::hash::BuildHasher;
-// use std::io::{BufWriter, Read, Write};
-// use std::net::{SocketAddr, TcpListener, TcpStream};
-// // use mysql::{OptsBuilder, Pool};
-// use mysql::*;
-// use std::thread;
-
 pub struct LineItem {
     id: i32,
     column_value: i32,
 }
-
-// // Print the random table
-
-// // Helper function to generate a random row
 
 fn generate_random_table(distance: i8) -> Vec<Vec<i8>> {
     let mut rng = rand::thread_rng();
@@ -127,31 +72,30 @@ fn generate_truth_table(num: i8, distance: i8) -> (Vec<Vec<i8>>, Vec<Vec<i8>>) {
     }
     return (p2_table, p3_table);
 }
-//go throuth whole table and for each row generate the truth tables
 
-fn raw_value(pool: &Pool, column_name: &str) -> Result<Vec<LineItem>, mysql::Error> {
-    let mut conn = pool.get_conn().unwrap();
-
-    //connect to database and then subtract the value
-    //     let qu:String="SELECT  id ,".to_owned()+&column_name;
-    //   let query = qu+"from p1test_share";
+fn raw_value(mut conn: PooledConn, column_name: &str) -> Result<Vec<LineItem>, mysql::Error> {
+    // let query = "SELECT id, order_key from test1";
     let query = "SELECT id, order_key from line_item_1m_testp1";
+
     let mut stmt = conn.query_map(query, |(id, column_value)| LineItem { id, column_value });
 
     return stmt;
 }
 
-fn process_row(id: i32, order_key: i32, user_number: i32) -> (i32, i32) {
-    return (id, (order_key - user_number.abs()));
-}
+fn send_shared_truthtable_to_parties(
+    mut stream: Arc<Mutex<TcpStream>>,
+    table: &Table,
+) -> io::Result<()> {
+    let mut stream1 = stream.lock().unwrap();
 
-fn send_shared_truthtable_to_parties(address: &str, table: &Table) {
-    let mut stream = TcpStream::connect(address).unwrap();
     let bytes = serde_json::to_string(&table).unwrap();
 
-    stream
+    stream1
         .write_all(&bytes.as_bytes())
         .expect("Failed to write table to stream");
+    drop(stream1);
+
+    Ok(())
 }
 
 fn start_p1(server_address: &str) {
@@ -159,46 +103,32 @@ fn start_p1(server_address: &str) {
 
     for stream in listener.incoming() {
         if let Ok(stream) = stream {
-            // Spawn a new thread to handle each client
             thread::spawn(move || handle_client_connection(stream));
         }
     }
 }
-fn handle_client(stream: TcpStream, sender: Sender<Message>) {
-    let mut buffer = String::new();
-    if let Ok(bytes_read) = stream.take(1024).read_to_string(&mut buffer) {
-        if bytes_read > 0 {
-            sender.send(Message::Data(buffer)).unwrap();
-        } else {
-            sender.send(Message::NoData).unwrap();
-        }
-    } else {
-        sender.send(Message::NoData).unwrap();
-    }
-}
 
 fn handle_client_connection(mut stream: TcpStream) {
-    // let mut buffer = [0; 4]; // Adjust buffer size as needed
-    let url = "mysql://root:123456789@localhost:3306/benchdb";
-    let pool = Pool::new(url).unwrap();
-
     let distance = 8;
     let column_name = "order_key";
-    let p2_address = "127.0.0.1:8082";
-    let p3_address = "127.0.0.1:8083";
+
+    let url = "mysql://root:123456789@localhost:3306/benchdb";
+    let pool = Pool::new(url).unwrap();
+    let mut conn = pool.get_conn().unwrap();
+    let p2_address: SocketAddr = "127.0.0.1:8082".parse().unwrap();
+    let connect_p2 = Arc::new(Mutex::new(
+        TcpStream::connect_timeout(&p2_address, Duration::from_secs(5)).unwrap(),
+    ));
 
     let mut buffer = String::new();
     if let Ok(bytes_read) = stream.take(1024).read_to_string(&mut buffer) {
         if bytes_read > 0 {
-            // println!("from client:{:?}", &buffer[..bytes_read]);
             let client_share = &buffer[..bytes_read];
-            // println!("from client:{:?}", client_share);
             let start_time = Instant::now();
 
             let client_i8: i32 = convert_str_int(client_share).into();
 
-            //fetch all row data and then subtract and go through generating truth tables
-            let smnt = raw_value(&pool, column_name); //
+            let smnt = raw_value(conn, column_name); //
 
             for row in smnt.iter().flatten() {
                 let new_value = row.column_value.wrapping_sub(client_i8.abs());
@@ -213,8 +143,8 @@ fn handle_client_connection(mut stream: TcpStream) {
                     rows: tab_p3,
                 };
                 // println!("Table2:{:?}---Table3:{:?}", table_p2, table_p3);
-                send_shared_truthtable_to_parties(p2_address, &table_p2);
-                send_shared_truthtable_to_parties(p3_address, &table_p3);
+                send_shared_truthtable_to_parties(connect_p2.clone(), &table_p2);
+                // send_shared_truthtable_to_parties(connect_p3.clone(), &table_p3);
             }
             let elapsed_time = start_time.elapsed();
             println!("P1 generating truth tables: {:?}", elapsed_time);
@@ -222,37 +152,7 @@ fn handle_client_connection(mut stream: TcpStream) {
     }
 }
 
-// // let smt = raw_value(&pool, user_number, column_name);
-// let smt = generate_random_table(8);
-// let table: Table = Table {
-//     row_id: 1,
-//     rows: smt,
-// };
-
-// send_shared_truthtable_to_parties(p2_address, &table);
-
-// for row in smt.iter().flatten() {
-//     let new_value = (row.column_value.wrapping_sub(user_number)).abs();
-
-//     let (p2_share_table, p3_share_table) = generate_truth_table(new_value, distance);
-
-//     println!(
-//         "p2 truth table {:?} p3share truth table:{:?} for row id:{:?}, and new value {:?}",
-//         p2_share_table, p3_share_table, row.id, new_value
-//     );
-//     send_shared_truthtable_to_parties(p2_address, p2_share_table, row.id);
-//     send_shared_truthtable_to_parties(p3_address, p3_share_table, row.id);
-// }
-
 fn main() {
-    // let url = "mysql://root:123456789@localhost:3306/testdb";
-    // let pool = Pool::new(url).unwrap();
-
-    let table_name = "p1test_share";
-    // let table_name="line_item_1m";
-
-    // let column_name: &str="order_key";
-    // let distance: i32=8;
     let p1_address = "127.0.0.1:8081";
 
     start_p1(p1_address);

@@ -82,21 +82,33 @@ fn raw_value(mut conn: PooledConn, column_name: &str) -> Result<Vec<LineItem>, m
     return stmt;
 }
 
-fn send_shared_truthtable_to_parties(
-    mut stream: Arc<Mutex<TcpStream>>,
-    table: &Table,
-) -> io::Result<()> {
-    let mut stream1 = stream.lock().unwrap();
-
+fn send_shared_truthtable_to_parties(addt: &str, table: &Table) -> io::Result<()> {
+    // let mut stream1 = stream.lock().unwrap();
+    let mut stream = TcpStream::connect(addt).unwrap();
     let bytes = serde_json::to_string(&table).unwrap();
 
-    stream1
+    stream
         .write_all(&bytes.as_bytes())
         .expect("Failed to write table to stream");
-    drop(stream1);
+    drop(stream);
 
     Ok(())
 }
+// fn send_shared_truthtable_to_parties(
+//     mut stream: Arc<Mutex<TcpStream>>,
+//     table: &Table,
+// ) -> io::Result<()> {
+//     let mut stream1 = stream.lock().unwrap();
+
+//     let bytes = serde_json::to_string(&table).unwrap();
+
+//     stream1
+//         .write_all(&bytes.as_bytes())
+//         .expect("Failed to write table to stream");
+//     drop(stream1);
+
+//     Ok(())
+// }
 
 fn start_p1(server_address: &str) {
     let listener = TcpListener::bind(server_address).expect("Failed to bind");
@@ -115,10 +127,10 @@ fn handle_client_connection(mut stream: TcpStream) {
     let url = "mysql://root:123456789@localhost:3306/benchdb";
     let pool = Pool::new(url).unwrap();
     let mut conn = pool.get_conn().unwrap();
-    let p2_address: SocketAddr = "127.0.0.1:8082".parse().unwrap();
-    let connect_p2 = Arc::new(Mutex::new(
-        TcpStream::connect_timeout(&p2_address, Duration::from_secs(5)).unwrap(),
-    ));
+    let p2_address = "127.0.0.1:8082";
+    // let connect_p2 = Arc::new(Mutex::new(
+    //     TcpStream::connect_timeout(&p2_address, Duration::from_secs(5)).unwrap(),
+    // ));
 
     let mut buffer = String::new();
     if let Ok(bytes_read) = stream.take(1024).read_to_string(&mut buffer) {
@@ -143,7 +155,7 @@ fn handle_client_connection(mut stream: TcpStream) {
                     rows: tab_p3,
                 };
                 // println!("Table2:{:?}---Table3:{:?}", table_p2, table_p3);
-                send_shared_truthtable_to_parties(connect_p2.clone(), &table_p2);
+                send_shared_truthtable_to_parties(p2_address, &table_p2);
                 // send_shared_truthtable_to_parties(connect_p3.clone(), &table_p3);
             }
             let elapsed_time = start_time.elapsed();

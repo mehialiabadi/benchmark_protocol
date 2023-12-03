@@ -1,13 +1,7 @@
-
-
-pub mod gen_data{
+pub mod gen_data {
     use mysql::{prelude::Queryable, Pool};
-use rand::Rng;
+    use rand::Rng;
     // Define the size of the table (rows and columns)
-
-  
-
-    
 
     // let binary_representation:String=String::from("00001010");
 
@@ -24,31 +18,30 @@ use rand::Rng;
 
     // println!("{:?}",share_p3);
 
-
     pub struct LineItem {
-        order_key: i64,
-        part_key: i64,
-        line_number: i64,
-        supp_key: i64,
+        order_key: i32,
+        part_key: i32,
+        line_number: i32,
+        supp_key: i32,
     }
-    
-    
+
     pub fn generate_line_item(num_rows: usize) -> Vec<LineItem> {
         let mut rng = rand::thread_rng();
         (0..num_rows)
             .map(|_| LineItem {
-                order_key: rng.gen_range(1..=1000000),
-                part_key: rng.gen_range(1..=500000),
+                order_key: rng.gen_range(1..=100),
+                part_key: rng.gen_range(1..=100),
                 line_number: rng.gen_range(1..=100),
-                supp_key: rng.gen_range(1..=200000),
+                supp_key: rng.gen_range(1..=100),
             })
             .collect()
     }
-    
+
     pub fn store_data(pool: &Pool, table_name: &str, data: &[LineItem]) {
         let mut conn = pool.get_conn().expect("Failed to get MySQL connection");
-        conn.query_drop(format!("TRUNCATE TABLE {}", table_name)).expect("Failed to truncate table");
-    
+        conn.query_drop(format!("TRUNCATE TABLE {}", table_name))
+            .expect("Failed to truncate table");
+
         for item in data {
             conn.exec_drop(
                 format!(
@@ -61,13 +54,6 @@ use rand::Rng;
         }
     }
 }
-
-
-
-
-
-
-
 
 // fn print_table(table: &Vec<Vec<i64>>) {
 //     for row in table {

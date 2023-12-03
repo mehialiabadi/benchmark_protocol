@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
+use std::time::Instant;
 use std::{result, thread};
 
 // #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -134,7 +135,7 @@ fn raw_value(pool: &Pool, column_name: &str) -> Result<Vec<LineItem>, mysql::Err
     //connect to database and then subtract the value
     //     let qu:String="SELECT  id ,".to_owned()+&column_name;
     //   let query = qu+"from p1test_share";
-    let query = "SELECT id, order_key from p1test_share";
+    let query = "SELECT id, order_key from line_item_1m_testp1";
     let mut stmt = conn.query_map(query, |(id, column_value)| LineItem { id, column_value });
 
     return stmt;
@@ -178,7 +179,7 @@ fn handle_client(stream: TcpStream, sender: Sender<Message>) {
 
 fn handle_client_connection(mut stream: TcpStream) {
     // let mut buffer = [0; 4]; // Adjust buffer size as needed
-    let url = "mysql://root:123456789@localhost:3306/testdb";
+    let url = "mysql://root:123456789@localhost:3306/benchdb";
     let pool = Pool::new(url).unwrap();
 
     let distance = 8;
@@ -191,7 +192,8 @@ fn handle_client_connection(mut stream: TcpStream) {
         if bytes_read > 0 {
             // println!("from client:{:?}", &buffer[..bytes_read]);
             let client_share = &buffer[..bytes_read];
-            println!("from client:{:?}", client_share);
+            // println!("from client:{:?}", client_share);
+            let start_time = Instant::now();
 
             let client_i8: i32 = convert_str_int(client_share).into();
 
@@ -210,10 +212,12 @@ fn handle_client_connection(mut stream: TcpStream) {
                     row_id: row.id as usize,
                     rows: tab_p3,
                 };
-                println!("Table2:{:?}---Table3:{:?}", table_p2, table_p3);
+                // println!("Table2:{:?}---Table3:{:?}", table_p2, table_p3);
                 send_shared_truthtable_to_parties(p2_address, &table_p2);
                 send_shared_truthtable_to_parties(p3_address, &table_p3);
             }
+            let elapsed_time = start_time.elapsed();
+            println!("P1 generating truth tables: {:?}", elapsed_time);
         }
     }
 }

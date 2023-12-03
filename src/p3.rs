@@ -99,7 +99,7 @@ pub fn process_table(
     // let query = qu2+"from p1test_share where id=".to_owned()+&row_id.to_string();
     // let query = qu+"from p1test_share where";
 
-    let query = format!("SELECT id, order_key FROM p2test_share  WHERE id = :id",);
+    let query = format!("SELECT id, order_key FROM line_item_1m_testp3  WHERE id = :id",);
 
     // // Execute the query with parameters
     // let result: Option<(i32, i32)> = conn.query_first(
@@ -115,7 +115,7 @@ pub fn process_table(
         .expect("Failed to execute query");
 
     if let Some((id, column_value)) = result {
-        println!("id: {}, value: {}", id, column_value);
+        // println!("id: {}, value: {}", id, column_value);
         let bin: String = format!(
             "{:08b}",
             (column_value.wrapping_sub(shared.try_into().unwrap())).abs()
@@ -124,7 +124,7 @@ pub fn process_table(
         let (s2, r2) = p2_computaion(truth_table, &bin);
         return (s2, r2);
     } else {
-        println!("No matching row found");
+        // println!("No matching row found");
         return (0, 0);
     }
     fn p2_computaion(truth_table: &mut Vec<Vec<i8>>, binary_p2number: &str) -> (i32, i32) {
@@ -133,20 +133,20 @@ pub fn process_table(
         let mut capital_s2: i32 = 0;
         let mut small_s2: i32;
         let mut r2 = 0;
-        println!("binary:{:?}", binary_p2number);
+        // println!("binary:{:?}", binary_p2number);
         let modulue = 32;
         for (index, character) in binary_p2number.chars().enumerate() {
             if character == '0' {
                 capital_s2 += truth_table[1][index] as i32;
-                println!("element:{:?}", truth_table[1][index]);
+                // println!("element:{:?}", truth_table[1][index]);
             } else {
                 capital_s2 += truth_table[0][index] as i32;
-                println!("element:{:?}", truth_table[0][index]);
+                // println!("element:{:?}", truth_table[0][index]);
             }
         }
         small_s2 = (capital_s2 / 8) as i32;
         r2 = capital_s2 % 8;
-        println!("capital S2:{:?}", capital_s2);
+        // println!("capital S2:{:?}", capital_s2);
         return ((small_s2 as f32).floor() as i32, r2 as i32);
     }
 }
@@ -312,7 +312,7 @@ fn send_result_to_parties(server_addr: &str, data: &String) {
 }
 
 fn start_p2(server_address: &str) {
-    let url = "mysql://root:123456789@localhost:3306/testdb";
+    let url = "mysql://root:123456789@localhost:3306/benchdb";
     let pool = Pool::new(url).unwrap();
     // let mut row_id = 0;
     let listener = TcpListener::bind(server_address).expect("Failed to bind");
@@ -337,14 +337,14 @@ fn start_p2(server_address: &str) {
             if let Some(res) = p2_prepare(&data_rec) {
                 match res {
                     Payload::Int(i) => {
-                        println!("integer received {}", i);
+                        // println!("integer received {}", i);
                         cleint_share = i;
                     }
                     Payload::Table(mut t) => {
-                        println!("Table received {:?}", t);
+                        // println!("Table received {:?}", t);
                         //create own table and send the result to p4 and client
                         let (s2, r2) = process_table(&pool, &mut t.rows, &t.row_id, cleint_share);
-                        println!("s2:{:?}, r2:{:?}, row:{:?}", s2, r2, t.row_id);
+                        // println!("s2:{:?}, r2:{:?}, row:{:?}", s2, r2, t.row_id);
                         //send result to p4 and client
 
                         let res_to_p4: Partyr = Partyr {

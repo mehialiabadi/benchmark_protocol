@@ -1,12 +1,14 @@
-use benchmark_protocol::table::{P4paylod, Partyr, Table};
+use benchmark_protocol::table::{PartyCollection, Partyr, Table};
 use mysql::prelude::*;
 use rand::Rng;
 use rusqlite::{Connection, Result, NO_PARAMS};
 use serde::de::value::UsizeDeserializer;
 use serde::{Deserialize, Serialize};
+use serde_json::Deserializer;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
 use std::{option, thread};
 // use mysql::{OptsBuilder, Pool};
 use mysql::*;
@@ -152,15 +154,35 @@ fn p4_prepare(data: &Message) -> Option<Partyr> {
         Message::NoData => None,
     }
 }
+// fn get_party(data: &Message) -> Partyr {
+//     if let Some(res) = p4_prepare(&data) {
+//         match res {
+//             Partyr => {
+//                 return Partyr;
+//             }
+
+//         }
+//         else {return None;}
+//     }
+// }
+// fn process_data(p2: Partyr) -> i8 {
+//     let my_collection:PartyCollection {
+
+//     }
+//     return 1;
+// }
+
+fn process_data(parrty1: Option<Partyr>) -> i8 {
+    return 1;
+}
 fn start_p4(server_address: &str) {
-    let url = "mysql://root:123456789@localhost:3306/testdb";
+    let url = "mysql://root:123456789@localhost:3306/benchdb";
     let pool = Pool::new(url).unwrap();
     // let mut row_id = 0;
     let listener = TcpListener::bind(server_address).expect("Failed to bind");
 
     let (sender1, receiver1) = channel();
     // let (sender2, receiver2) = channel();
-    let client_address = "127.0.0.1:8080"; // Assuming p2 is listening on port 8082
 
     for stream in listener.incoming() {
         if let Ok(stream) = stream {
@@ -177,17 +199,111 @@ fn start_p4(server_address: &str) {
             //             // Spawn separate threads for P2 and P3
             let r2_handle = thread::spawn(move || handle_p2(p2_stream, sender1_clone));
             let mut data_rec = receiver1.recv().expect("Failed handle1 thread 1");
-            println!("raw---{:?}", data_rec);
-            if let Some(res) = p4_prepare(&data_rec) {
-                match res {
-                    Partyr => {
-                        println!("Row ID: {}, Comput: {}", Partyr.row_id, Partyr.comput);
-                    }
-                }
-            }
+            // println!("raw---{:?}", data_rec);
+            // let part1: Partyr = p4_prepare(&data_rec);
+            println!("data:{:?}", data_rec);
+            // let option_party: Partyr = p4_prepare(&data_rec).unwrap();
+            // let data2: Option<Partyr> = p4_prepare(&data_rec);
+            // if let (Some(party1)) = (data1) {
+            //     // Process the data pair
+            //     let w = process_data(party1);
+            //     // println!("wwww:{:?}", w);
+            // } else {
+            //     eprintln!("Failed to deserialize data");
+            // }
 
-            // process_data(data_recieved);
+            // let shared_data = Arc::new(Mutex::new(data_rec));
+            // let shared_data_clone = shared_data.clone();
+
+            // let t1 = thread::spawn(move || {
+            // let mut data_iter = shared_data.lock().unwrap();
+
+            // while let Some(data1) = data_iter.next() {
+            // if let Some(data2) = data_iter.next() {
+            // let party1: Option<Partyr> = p4_prepare(&data_iter);
+            // let party2: Option<Partyr> = p4_prepare(&data2);
+
+            // Process the data pair
+            // process_data(party1);
+            // } else {
+            // Break if no more data
+            // break;
+            // }
+            // }
+            // after locked_user goes out of scope, mutex will be unlocked again,
+            // but you can also explicitly unlock it with:
+            // drop(locked_user);
+            // });
+
+            // Create a vector to hold the thread handles
+            // let mut handles: Vec<_> = vec![];
+
+            // Number of threads you want to process the data
+            // let num_threads = 2;
+
+            // for _ in 0..num_threads {
+            //     // Clone the Arc to share among threads
+            //     let shared_data = Arc::clone(&shared_data);
+
+            // Spawn a new thread
+            // let handle = thread::spawn(move || {
+            // Lock the mutex to get exclusive access to the shared data
+            // let mut data_iter: std::sync::MutexGuard<'_, Partyr> = shared_data.lock().unwrap();
+
+            //     // Process the data in pairs
+            //     while let Some(data1) = data_iter.into() {
+            //         if let Some(data2) = data_iter.into() {
+            //             // Deserialize the data into Party structs
+            //             let party1: Partyr = serde_json::from_str(&data1).ok()?;
+            //             let party2: Partyr = serde_json::from_str(&data2).ok()?;
+
+            //             // Process the data pair
+            //             process_data((party1, party2));
+            //         } else {
+            //             // Break if no more data
+            //             break;
+            //         }
+            //     }
+            // });
+
+            // Keep track of the thread handles
+            // handles.push(handle);
         }
+
+        // Wait for all threads to finish
+        // for handle in handles {
+        //     handle.join().unwrap();
+        // }
+        // match option_party {
+        //     Some(party) => {
+        //         // Process the Party
+        //         println!("Processing party: {:?}", party);
+        //     }
+        //     None => {
+        //         // Handle the None case
+        //         println!("Received None");
+        //     }
+        // }
+
+        // let mut deserializer = Deserializer::from_reader(valu.as_bytes());
+
+        // while let Ok(party1) = Partyr::deserialize(&mut deserializer) {
+        //     if let Ok(party2) = Partyr::deserialize(&mut deserializer) {
+        //         // Process the data pair
+        //         println!("pair:{:?}{:?}", party1, party2);
+        //         // process_data((party1, party2));
+        //     } else {
+        //         // Handle any remaining single item or odd-sized chunk
+        //         eprintln!("Unexpected data format");
+        //         break;
+        //     }
+        // }
+        // let party_collection = PartyCollection {
+        //     parties: [party1, party2],
+        // };
+        // let part1: get_party(&data_rec);
+
+        // process_data(data_recieved);
     }
 }
 

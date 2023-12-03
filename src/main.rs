@@ -1,6 +1,11 @@
 use std::process::{exit, Command};
 
+use mysql::Pool;
+mod generate_data;
+use generate_data::gen_data::{generate_line_item, store_data};
 fn main() {
+  
+
     // Replace these strings with the actual names or paths of your server and client binaries
     let primary = "../target/debug/primary";
     let p2 = "../target/debug/p2";

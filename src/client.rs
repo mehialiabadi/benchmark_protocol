@@ -119,7 +119,7 @@ fn main() {
     let p2_address = "127.0.0.1:8082";
     let p3_address = "127.0.0.1:8083";
     let listener_client = TcpListener::bind(client_address).unwrap();
-    println!("client is listening  on port 8080");
+    // println!("client is listening  on port 8080");
 
     let column_name = "order_key";
 

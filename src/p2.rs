@@ -11,6 +11,7 @@ use serde_json::json;
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use benchmark_protocol::table::{Partyr, Table};
@@ -138,13 +139,20 @@ fn p2_prepare(data: &Message) -> Option<Payload> {
     }
 }
 
-fn send_result_to_parties(server_addr: &str, data: &Partyr) {
-    let mut stream = TcpStream::connect(server_addr).unwrap();
+fn send_result_to_parties(addt: &Arc<Mutex<TcpStream>>, data: &Partyr) -> io::Result<()> {
+    let mut stream = addt.lock().unwrap();
+
     let bytes = serde_json::to_string(&data).unwrap();
 
     stream
         .write_all(&bytes.as_bytes())
         .expect("Failed to write table to stream");
+
+    stream
+        .shutdown(Shutdown::Both)
+        .expect("shutdown call failed");
+
+    Ok(())
 }
 
 fn start_p2(server_address: &str) {
@@ -157,6 +165,11 @@ fn start_p2(server_address: &str) {
     let (sender1, receiver1) = channel();
 
     let p4_address = "127.0.0.1:8084"; // Assuming p4 is listening on port 8084
+
+    let mut tcp_stream = TcpStream::connect("127.0.0.1:8084").unwrap();
+
+    let p2_stream = Arc::new(Mutex::new(tcp_stream));
+
     let mut cleint_share = 0;
     for stream in listener.incoming() {
         if let Ok(stream) = stream {
@@ -185,7 +198,7 @@ fn start_p2(server_address: &str) {
                         };
 
                         // send_result_to_parties(client_address, &res_to_client.to_string());
-                        send_result_to_parties(p4_address, &res_to_p4);
+                        send_result_to_parties(&p2_stream, &res_to_p4);
                         //
                     }
                 }

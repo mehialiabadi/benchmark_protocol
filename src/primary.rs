@@ -3,7 +3,7 @@ use mysql::{prelude::*, Pool, PooledConn};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Error, Read, Write};
-use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
@@ -82,15 +82,24 @@ fn raw_value(mut conn: PooledConn, column_name: &str) -> Result<Vec<LineItem>, m
     return stmt;
 }
 
-fn send_shared_truthtable_to_parties(addt: &str, table: &Table) -> io::Result<()> {
+fn send_shared_truthtable_to_parties(
+    addt: &Arc<Mutex<TcpStream>>,
+    table: &Table,
+) -> io::Result<()> {
     // let mut stream1 = stream.lock().unwrap();
-    let mut stream = TcpStream::connect(addt).unwrap();
+
+    // let mut stream = TcpStream::connect_timeout(&addt, Duration::from_secs(10)).unwrap();
+    let mut stream = addt.lock().unwrap();
+
     let bytes = serde_json::to_string(&table).unwrap();
 
     stream
         .write_all(&bytes.as_bytes())
         .expect("Failed to write table to stream");
-    drop(stream);
+
+    stream
+        .shutdown(Shutdown::Both)
+        .expect("shutdown call failed");
 
     Ok(())
 }
@@ -127,10 +136,14 @@ fn handle_client_connection(mut stream: TcpStream) {
     let url = "mysql://root:123456789@localhost:3306/benchdb";
     let pool = Pool::new(url).unwrap();
     let mut conn = pool.get_conn().unwrap();
-    let p2_address = "127.0.0.1:8082";
+    // let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8082);
     // let connect_p2 = Arc::new(Mutex::new(
     //     TcpStream::connect_timeout(&p2_address, Duration::from_secs(5)).unwrap(),
     // ));
+
+    let mut tcp_stream = TcpStream::connect("127.0.0.1:8082").unwrap();
+
+    let p2_stream = Arc::new(Mutex::new(tcp_stream));
 
     let mut buffer = String::new();
     if let Ok(bytes_read) = stream.take(1024).read_to_string(&mut buffer) {
@@ -155,7 +168,7 @@ fn handle_client_connection(mut stream: TcpStream) {
                     rows: tab_p3,
                 };
                 // println!("Table2:{:?}---Table3:{:?}", table_p2, table_p3);
-                send_shared_truthtable_to_parties(p2_address, &table_p2);
+                send_shared_truthtable_to_parties(&p2_stream, &table_p2);
                 // send_shared_truthtable_to_parties(connect_p3.clone(), &table_p3);
             }
             let elapsed_time = start_time.elapsed();

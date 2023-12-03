@@ -148,9 +148,9 @@ fn send_result_to_parties(addt: &Arc<Mutex<TcpStream>>, data: &Partyr) -> io::Re
         .write_all(&bytes.as_bytes())
         .expect("Failed to write table to stream");
 
-    stream
-        .shutdown(Shutdown::Both)
-        .expect("shutdown call failed");
+    // stream
+    //     .shutdown(Shutdown::Both)
+    //     .expect("shutdown call failed");
 
     Ok(())
 }

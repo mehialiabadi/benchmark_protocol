@@ -97,9 +97,9 @@ fn send_shared_truthtable_to_parties(
         .write_all(&bytes.as_bytes())
         .expect("Failed to write table to stream");
 
-    stream
-        .shutdown(Shutdown::Both)
-        .expect("shutdown call failed");
+    // stream
+    //     .shutdown(Shutdown::Both)
+    //     .expect("shutdown call failed");
 
     Ok(())
 }

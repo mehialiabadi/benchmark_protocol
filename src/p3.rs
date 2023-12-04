@@ -1,64 +1,80 @@
-use bincode::{deserialize, serialize};
-use byteorder::{LittleEndian, ReadBytesExt};
+use benchmark_protocol::table::{ClientShare, Partyr, Table};
 use mysql::prelude::*;
 use mysql::*;
-use num::complex::ComplexFloat;
-use num::Signed;
-use rand::Rng;
-use rusqlite::{Connection, Result, NO_PARAMS};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::io::{self, Read, Write};
-use std::net::{Shutdown, TcpListener, TcpStream};
-use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, Mutex};
+use mysql::{prelude::*, Pool, PooledConn};
+use serde_json;
+use std::io;
+use std::io::Read;
+use std::io::{BufRead, BufReader, Write};
+use std::net::{TcpListener, TcpStream};
 use std::thread;
-
-use benchmark_protocol::table::{Partyr, Table};
-
 enum Payload {
     Int(usize),
     Table(Table),
 }
 
-#[derive(Debug)]
-enum Message {
-    Data(String),
-    NoData,
-}
-pub struct LineItem {
-    id: i32,
-    column_value: i32,
-}
+fn start_p3() {
+    let listener = TcpListener::bind("127.0.0.1:8083").unwrap();
 
-impl Message {
-    fn to_string(&self) -> String {
-        match self {
-            Message::Data(text) => text.clone(),
-            Message::NoData => todo!(),
-            // Handle other variants if needed
-        }
+    while let Ok((stream, _)) = listener.accept() {
+        let mut stream_p4 = TcpStream::connect("127.0.0.1:8084").unwrap();
+        let mut stream_client = TcpStream::connect("127.0.0.1:8080").unwrap();
+
+        handle_client(stream, stream_p4, stream_client);
     }
 }
-impl Message {
-    fn last_char(&self) -> Option<char> {
-        match self {
-            Message::Data(data) => data.chars().last(),
-            Message::NoData => todo!(),
-            // Handle other variants if needed
+fn handle_client(mut stream: TcpStream, mut stream_p4: TcpStream, mut stream_client: TcpStream) {
+    let url = "mysql://root:123456789@localhost:3306/benchdb";
+    let pool = Pool::new(url).unwrap();
+    let mut conn = pool.get_conn().unwrap();
+    // let mut tcp_stream = TcpStream::connect("127.0.0.1:8084").unwrap();
+    let buffer_size = 1;
+    // let mut buffer = vec![0u8; buffer_size];
+    // let mut stream = &stream;
+    let cleint_share = 9;
+    // stream.read_exact(&mut buffer);
+    // let cleint_share = serde_json::from_slice(&buffer);
+    // println!("client share:{:?}", cleint_share);
+    // let received_data_str = String::from_utf8_lossy(&buffer).trim();
+    // print!("{:?}", &buffer);
+    let reader = BufReader::new(stream);
+
+    // Deserialize the received JSON into MyData struct
+    // let received_data: ClientShare = serde_json::from_str(received_data_str);
+
+    for line in reader.lines() {
+        match line {
+            Ok(json_str) => {
+                let mut my_table: Table =
+                    serde_json::from_str(&json_str).expect("Failed to deserialize JSON");
+
+                let (s2, r2) = process_table(
+                    &mut conn,
+                    &mut my_table.rows,
+                    &my_table.row_id,
+                    cleint_share,
+                );
+
+                let res_to_p4: Partyr = Partyr {
+                    row_id: (my_table.row_id),
+                    comput: (r2),
+                };
+                let res_to_client: Partyr = Partyr {
+                    row_id: (my_table.row_id),
+                    comput: (s2),
+                };
+                // println!("{:?}", res_to_client);
+                send_result_to_parties(&stream_client, &res_to_client);
+
+                // process(my_struct);
+                send_result_to_parties(&stream_p4, &res_to_p4);
+            }
+
+            Err(e) => {
+                eprintln!("Error reading line: {}", e);
+                break;
+            }
         }
-    }
-}
-fn handle_client(stream: TcpStream, sender: Sender<Message>) {
-    let mut buffer = String::new();
-    if let Ok(bytes_read) = stream.take(1024).read_to_string(&mut buffer) {
-        if bytes_read > 0 {
-            sender.send(Message::Data(buffer)).unwrap();
-        } else {
-            sender.send(Message::NoData).unwrap();
-        }
-    } else {
-        sender.send(Message::NoData).unwrap();
     }
 }
 
@@ -66,7 +82,7 @@ pub fn process_table(
     conn: &mut PooledConn,
     truth_table: &mut Vec<Vec<i8>>,
     row_id: &usize,
-    shared: usize,
+    shared: i32,
 ) -> (i32, i32) {
     let column_name = "order_key";
 
@@ -121,102 +137,18 @@ pub fn process_table(
         return ((small_s2 as f32).floor() as i32, r2 as i32);
     }
 }
-
-fn p2_prepare(data: &Message) -> Option<Payload> {
-    match data {
-        Message::Data(data) => {
-            if let Ok(i) = data.parse::<usize>() {
-                return Some(Payload::Int(i));
-            }
-
-            let r: Result<Table, serde_json::Error> = serde_json::from_str(data);
-            match r {
-                Ok(table) => Some(Payload::Table(table)),
-                _ => None,
-            }
-        }
-        Message::NoData => None,
-    }
-}
-
-fn send_result_to_parties(addt: &Arc<Mutex<TcpStream>>, data: &Partyr) -> io::Result<()> {
-    let mut stream = addt.lock().unwrap();
-
+fn send_result_to_parties(mut stream: &TcpStream, data: &Partyr) {
     let bytes = serde_json::to_string(&data).unwrap();
 
     stream
         .write_all(&bytes.as_bytes())
         .expect("Failed to write table to stream");
+    stream.write_all(b"\n").expect("Failed to write to stream");
 
     // stream
     //     .shutdown(Shutdown::Both)
     //     .expect("shutdown call failed");
-
-    Ok(())
 }
-
-fn start_p2(server_address: &str) {
-    let url = "mysql://root:123456789@localhost:3306/benchdb";
-    let pool = Pool::new(url).unwrap();
-    let mut conn = pool.get_conn().unwrap();
-
-    let listener = TcpListener::bind(server_address).expect("Failed to bind");
-
-    let (sender1, receiver1) = channel();
-
-    let p4_address = "127.0.0.1:8084"; // Assuming p4 is listening on port 8084
-
-    let mut tcp_stream = TcpStream::connect("127.0.0.1:8084").unwrap();
-
-    let p2_stream = Arc::new(Mutex::new(tcp_stream));
-
-    let mut cleint_share = 0;
-    for stream in listener.incoming() {
-        if let Ok(stream) = stream {
-            let sender1_clone = sender1.clone();
-
-            // Spawn threads to handle each server connection
-            let handle1 = thread::spawn(|| handle_client(stream, sender1_clone));
-            let mut data_rec = receiver1.recv().expect("Failed handle1 thread 1");
-
-            if let Some(res) = p2_prepare(&data_rec) {
-                match res {
-                    Payload::Int(i) => {
-                        cleint_share = i;
-                    }
-                    Payload::Table(mut t) => {
-                        let (s2, r2) =
-                            process_table(&mut conn, &mut t.rows, &t.row_id, cleint_share);
-
-                        let res_to_p4: Partyr = Partyr {
-                            row_id: (t.row_id),
-                            comput: (r2),
-                        };
-                        let res_to_client: Partyr = Partyr {
-                            row_id: (t.row_id),
-                            comput: (s2),
-                        };
-
-                        // send_result_to_parties(client_address, &res_to_client.to_string());
-                        send_result_to_parties(&p2_stream, &res_to_p4);
-                        //
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn main() {
-    // let url = "mysql://root@localhost:3306/testdb";
-    // let pool = Pool::new(url).unwrap();
-    // let table_name="line_item_1m";
-    // let table_name = "p2share_test";
-    // let column_name = "order_key";
-    // let distance = 32;
-
-    let p2_address = "127.0.0.1:8083"; // Assuming p2 is listening on port 8082
-
-    // let mut stream_p4_clone = stream_p4.try_clone().unwrap();
-    start_p2(p2_address);
+    start_p3();
 }

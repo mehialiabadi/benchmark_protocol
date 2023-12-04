@@ -1,14 +1,29 @@
+use benchmark_protocol::table::ClientShare;
 use benchmark_protocol::table::Table;
 use mysql::{prelude::*, Pool, PooledConn};
+use num::traits::float;
+use num::Float;
+use num::Signed;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::io::BufRead;
+use std::io::BufReader;
 use std::io::{self, Error, Read, Write};
-use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::net::TcpStream;
+use std::thread::Thread;
+// use tokio::io::BufReader;
+use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener};
+use std::ops::Add;
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 use std::time::Instant;
 use std::{result, thread};
+// use tokio::io::AsyncWriteExt;
+// use std::io::{BufRead, BufReader};
+// use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+// use tokio::io::{AsyncReadExt, AsyncWriteExt};
+// use tokio::net::{TcpListener, TcpStream};
 
 // #[derive(Serialize, Deserialize, Debug, Clone)]
 // struct Table {
@@ -73,7 +88,7 @@ fn generate_truth_table(num: i8, distance: i8) -> (Vec<Vec<i8>>, Vec<Vec<i8>>) {
     return (p2_table, p3_table);
 }
 
-fn raw_value(mut conn: PooledConn, column_name: &str) -> Result<Vec<LineItem>, mysql::Error> {
+fn raw_value(conn: &mut PooledConn, column_name: &str) -> Result<Vec<LineItem>, mysql::Error> {
     // let query = "SELECT id, order_key from test1";
     let query = "SELECT id, order_key from line_item_1m_testp1";
 
@@ -82,82 +97,118 @@ fn raw_value(mut conn: PooledConn, column_name: &str) -> Result<Vec<LineItem>, m
     return stmt;
 }
 
-fn send_shared_truthtable_to_parties(addt: Arc<Mutex<TcpStream>>, table: &Table) -> io::Result<()> {
+fn send_shared_truthtable_to_parties(
+    mut stream: &TcpStream,
+    my_vectors: &Vec<Table>,
+) -> io::Result<()> {
     // let mut stream1 = stream.lock().unwrap();
+    for item in my_vectors.iter() {
+        let bytes = serde_json::to_string(&item).unwrap();
 
-    // let mut stream = TcpStream::connect_timeout(&addt, Duration::from_secs(10)).unwrap();
-    let mut stream = addt.lock().unwrap();
+        stream.write_all(&bytes.as_bytes()).unwrap();
+        stream.write_all(b"\n").unwrap();
 
-    let bytes = serde_json::to_string(&table).unwrap();
+        // stream
+        //     .shutdown(Shutdown::Both)
+        //     .expect("shutdown call failed");
+    }
+    Ok(())
+}
 
-    stream
-        .write_all(&bytes.as_bytes())
-        .expect("Failed to write table to stream");
+fn start_p1(server_address: &str) -> io::Result<()> {
+    // println!("what");
+    let listener = TcpListener::bind(server_address).unwrap();
 
-    // stream
-    //     .shutdown(Shutdown::Both)
-    //     .expect("shutdown call failed");
+    // while let Ok((stream, _)) = listener.accept() {
+    //     // let stream_p2_clone = stream_p2.try_clone().unwrap();
+
+    //     Thread::spawn(handle_client_connection(stream));
+    // }
+
+    if let Ok((stream, _)) = listener.accept() {
+        handle_client_connection(stream);
+    }
 
     Ok(())
 }
 
-fn start_p1(server_address: &str) {
-    let listener = TcpListener::bind(server_address).expect("Failed to bind");
+//
 
-    for stream in listener.incoming() {
-        if let Ok(stream) = stream {
-            thread::spawn(move || handle_client_connection(stream));
-        }
-    }
-}
+//
 
 fn handle_client_connection(mut stream: TcpStream) {
     let distance = 8;
     let column_name = "order_key";
+    let mut my_tables_p2: Vec<Table> = Vec::new();
+    let mut my_tables_p3: Vec<Table> = Vec::new();
 
     let url = "mysql://root:123456789@localhost:3306/benchdb";
     let pool = Pool::new(url).unwrap();
     let mut conn = pool.get_conn().unwrap();
-    let mut tcp_stream = TcpStream::connect("127.0.0.1:8082").unwrap();
+    // let p2_stream = Arc::new(Mutex::new(tcp_stream));
+    let mut stream_p2 = TcpStream::connect("127.0.0.1:8082").unwrap();
+    let mut stream_p3 = TcpStream::connect("127.0.0.1:8083").unwrap();
 
-    let p2_stream = Arc::new(Mutex::new(tcp_stream));
+    // let stream_p2_clone = stream_p2.try_clone().unwrap();
+    // let stream_p3_clone = stream_p3.try_clone().unwrap();
+    let mut truth_time: f64 = 0.0;
+    let mut client_i8 = 0;
 
-    let mut buffer = String::new();
-    if let Ok(bytes_read) = stream.take(1024).read_to_string(&mut buffer) {
-        if bytes_read > 0 {
-            let client_share = &buffer[..bytes_read];
-            let start_time = Instant::now();
+    let reader = BufReader::new(&stream);
 
-            let client_i8: i32 = convert_str_int(client_share).into();
+    if let Some(Ok(line)) = reader.lines().next() {
+        println!("Received line: {}", line);
 
-            let smnt = raw_value(conn, column_name); //
+        let mut my_share: ClientShare =
+            serde_json::from_str(&line).expect("Failed to deserialize JSON");
 
-            for row in smnt.iter().flatten() {
-                let new_value = row.column_value.wrapping_sub(client_i8.abs());
+        let start_time_database: Instant = Instant::now();
 
-                let (tab_p2, tab_p3) = generate_truth_table(new_value.try_into().unwrap(), 8);
-                let table_p2: Table = Table {
-                    row_id: row.id as usize,
-                    rows: tab_p2,
-                };
-                let table_p3: Table = Table {
-                    row_id: row.id as usize,
-                    rows: tab_p3,
-                };
-                let p2_stream_clone = Arc::clone(&p2_stream);
-
-                // println!("Table2:{:?}---Table3:{:?}", table_p2, table_p3);
-                send_shared_truthtable_to_parties(p2_stream_clone, &table_p2);
-                // send_shared_truthtable_to_parties(connect_p3.clone(), &table_p3);
-            }
-            let elapsed_time = start_time.elapsed();
-            println!("P1 generating truth tables: {:?}", elapsed_time);
-        }
+        let client_i8: i32 = my_share.share1;
     }
+
+    let smnt = raw_value(&mut conn, column_name); //
+
+    // let elapsed_time_database = start_time_database.elapsed();
+    // println!(
+    //     "time to get 1m records from databse-{:?}",
+    //     elapsed_time_database
+    // );
+
+    let start_time_truth_table: Instant = Instant::now();
+
+    for row in smnt.iter().flatten() {
+        let new_value = row.column_value.wrapping_sub(client_i8.abs());
+
+        let start_time_per_truth_table: Instant = Instant::now();
+
+        let (tab_p2, tab_p3) = generate_truth_table(new_value.try_into().unwrap(), 8);
+        let elapsed_time_per_truth_table = start_time_per_truth_table.elapsed();
+        truth_time += elapsed_time_per_truth_table.as_secs_f64();
+        let table_p2: Table = Table {
+            row_id: row.id as usize,
+            rows: tab_p2,
+        };
+        let table_p3: Table = Table {
+            row_id: row.id as usize,
+            rows: tab_p3,
+        };
+
+        my_tables_p2.push(table_p2);
+        my_tables_p3.push(table_p3);
+    }
+    let _ = send_shared_truthtable_to_parties(&stream_p2, &my_tables_p2);
+
+    send_shared_truthtable_to_parties(&stream_p3, &my_tables_p3);
+
+    println!("truth table time:{:?}", truth_time);
+
+    let elapsed_time_truth_table = start_time_truth_table.elapsed();
+
+    println!("P1 process+networking: {:?}", elapsed_time_truth_table);
 }
 
 fn main() {
     let p1_address = "127.0.0.1:8081";
-
     start_p1(p1_address);
 }

@@ -1,3 +1,4 @@
+use benchmark_protocol::table::ClientShare;
 use rand::Rng;
 use std::io::Read;
 use std::io::{self, Write};
@@ -44,82 +45,35 @@ fn handle_p4(mut stream: TcpStream) -> i8 {
     r
 }
 
-fn write_to_server(server_address: &str, data: i32) -> io::Result<()> {
+fn send_data_to_p123(server_address: &str, data: ClientShare) -> io::Result<()> {
     // Connect to the server
     let mut stream = TcpStream::connect(server_address)?;
-
-    // Send data to the server
-    stream.write_all(&data.to_be_bytes())?;
-    println!("Client sent to {}: {}", server_address, data);
-
-    // Read and print the response from the server (optional)
-    let mut response = [0; 1024];
-    let bytes_read = stream.read(&mut response)?;
-    println!(
-        "Client received from {}: {:?}",
-        server_address,
-        &response[..bytes_read]
-    );
-
-    Ok(())
-}
-fn send_data_to_p1(server_address: &str, data: String) -> io::Result<()> {
-    // Connect to the server
-    let mut stream = TcpStream::connect(server_address)?;
-    // let json_user = serde_json::to_string(&data).unwrap();
-
-    // Send data to the server
+    let bytes = serde_json::to_string(&data).unwrap();
+    println!("size:{:?}", bytes.as_bytes());
     stream
-        .write_all(data.as_bytes())
+        .write_all(bytes.as_bytes())
         .expect("Failed to write table to stream");
-
-    // println!(
-    //     "Client sent to {}: {:?}",
-    //     server_address,
-    //     &data.to_be_bytes()
-    // );
-
-    // Read and print the response from the server (optional)
-    // let mut response = [0; 1024];
-    // let bytes_read = stream.read(&mut response)?;
-    // println!("Client received from {}: {:?}", server_address, &response[..bytes_read]);
+    // stream.write_all(b"\n");
 
     Ok(())
 }
 fn send_data_to_p2(server_address: &str, data: String) -> io::Result<()> {
     // Connect to the server
     let mut stream = TcpStream::connect(server_address)?;
-    // let json_user = serde_json::to_string(&data).unwrap();
 
-    // Send data to the server
     stream
         .write_all(&data.as_bytes())
         .expect("Failed to write table to stream");
 
-    // println!(
-    //     "Client sent to {}: {:?}",
-    //     server_address,
-    //     &data.to_be_bytes()
-    // );
-
-    // Read and print the response from the server (optional)
-    // let mut response = [0; 1024];
-    // let bytes_read = stream.read(&mut response)?;
-    // println!("Client received from {}: {:?}", server_address, &response[..bytes_read]);
-
     Ok(())
 }
-
+fn handle_client_connection(mut stream: TcpStream) {}
 fn main() {
-    // let table_name="line_item_1m";
-    // let table_name="user";
-
     let client_address = "127.0.0.1:8080";
     let p1_address = "127.0.0.1:8081";
     let p2_address = "127.0.0.1:8082";
     let p3_address = "127.0.0.1:8083";
     let listener_client = TcpListener::bind(client_address).unwrap();
-    // println!("client is listening  on port 8080");
 
     let column_name = "order_key";
 
@@ -130,54 +84,29 @@ fn main() {
         .expect("Failed to read line");
     let user_number: i32 = input.trim().parse().expect("Invalid number entered");
 
-    let start_time = Instant::now();
-
-    // Generate the additive shares and send them to p1 and p2 and p3
-    let (p1_share, p23_share) = generate_additive_shares(user_number);
-    println!("{:?},{:?}", &p1_share, &p23_share);
-
-    let handle1 = thread::spawn(move || send_data_to_p1(p1_address, p1_share.to_string()));
-    let handle2 = thread::spawn(move || send_data_to_p2(p2_address, p23_share.to_string()));
-    let handle3 = thread::spawn(move || send_data_to_p2(p3_address, p23_share.to_string()));
+    let (share1, share2) = generate_additive_shares(user_number);
+    println!("{:?},{:?}", share1, share2);
+    let shareStruct1: ClientShare = ClientShare { share1: (share1) };
+    let shareStruct23: ClientShare = ClientShare { share1: (share2) };
+    let share3: ClientShare = ClientShare { share1: (share2) };
+    let handle1 = thread::spawn(move || send_data_to_p123(p1_address, shareStruct1));
+    // let handle2 = thread::spawn(move || send_data_to_p123(p2_address, shareStruct23));
+    // let handle3 = thread::spawn(move || send_data_to_p123(p3_address, share3));
 
     // Wait for three threads to finish
     handle1.join().unwrap().expect("Error in thread 1");
-    handle2.join().unwrap().expect("Error in thread 1");
-    handle3.join().unwrap().expect("Error in thread 1");
-    //////
-    // println!("if data send to clients");
+    // handle2.join().unwrap().expect("Error in thread 1");
+    // handle3.join().unwrap().expect("Error in thread 1");
 
-    //recieve the protocol's result from p2,p3 ,p4
+    // Todo : client recieves some results from p2, p3 and primary
 
-    //     for stream in listener_client.incoming() {
-    //          match stream {
-    //             Ok(stream) => {
-    //         let p4_stream = stream.try_clone().unwrap();
-    //         let p2_stream = stream.try_clone().unwrap();
-    //         let p3_stream = stream.try_clone().unwrap();
+    // while let Ok((stream, _)) = listener.accept() {
+    //     // let stream_p2_clone = stream_p2.try_clone().unwrap();
 
-    //         // Spawn separate threads for P2 and P3 and P4
-    //         let s2_handle = thread::spawn(move || {
-    //             handle_p2(p2_stream)
-    //         });
-
-    //         let s3_handle = thread::spawn(move || {
-    //             handle_p3(p3_stream)
-    //         });
-    //         let r_handle = thread::spawn(move || {
-    //             handle_p3(p4_stream)
-    //         });
-
-    //         // Wait for three threads to finish and get their results
-    //         let s2 = s2_handle.join().unwrap();
-    //         let s3 = s3_handle.join().unwrap();
-    //         let r = r_handle.join().unwrap();
-    //     }
-    //         Err(e) => {
-    //             eprintln!("Error: {}", e);
-    //         }
-    //     }
+    //     Thread::spawn(handle_client_connection(stream));
     // }
-    let elapsed_time = start_time.elapsed();
-    //  println!("select query time complexity for- {:?} and table - {:?}:::{:?} is ",column_name,table_name,elapsed_time );
+
+    if let Ok((stream, _)) = listener_client.accept() {
+        handle_client_connection(stream);
+    }
 }
